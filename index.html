@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Scrawl — draw with a seed</title>
+<meta name="description" content="A drawing machine. Every mark is generated, so nothing is stock.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Anton&family=Bebas+Neue&family=Caveat:wght@700&family=Permanent+Marker&family=Gloria+Hallelujah&family=Space+Grotesk:wght@400;700&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&family=Libre+Baskerville:wght@700&family=Rock+Salt&family=Shadows+Into+Light&family=Bungee&family=Righteous&family=Syne:wght@800&family=Instrument+Serif&family=Fraunces:opsz,wght@9..144,700&family=Bricolage+Grotesque:wght@800&family=Unbounded:wght@700&family=Chivo+Mono:wght@500&family=Sora:wght@700&family=Outfit:wght@700&family=Lora:wght@600&family=Cormorant+Garamond:wght@700&family=Alfa+Slab+One&family=Abril+Fatface&family=Kalam:wght@700&family=Patrick+Hand&family=Architects+Daughter&family=Special+Elite&family=Silkscreen&display=swap" rel="stylesheet">
+<style>
+/* ================= tokens ================= */
+:root{
+  --app:#FFFFFF; --panel:#FFFFFF; --sunk:#F5F5F6; --line:#E6E6E9; --line2:#D2D2D8;
+  --txt:#1B1B1F; --dim:#71717A; --hover:#F1F1F3; --canvas:#EFEFF1;
+  --blue:#0D99FF; --blueSoft:#E5F3FF; --danger:#E5484D; --guide:#F24822;
+  --r:6px; --rl:10px; --leftW:290px; --rightW:300px;
+  --shadow:0 1px 2px rgba(0,0,0,.05),0 8px 26px rgba(0,0,0,.10);
+  --pop:0 4px 12px rgba(0,0,0,.10),0 16px 44px rgba(0,0,0,.14);
+}
+:root[data-theme="dark"]{
+  --app:#1E1E1E; --panel:#2C2C2C; --sunk:#252525; --line:#3A3A3A; --line2:#4C4C4C;
+  --txt:#EAEAEA; --dim:#9E9E9E; --hover:#383838; --canvas:#151515;
+  --blueSoft:#12304A; --danger:#F1666A;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 34px rgba(0,0,0,.5);
+  --pop:0 6px 18px rgba(0,0,0,.5),0 20px 50px rgba(0,0,0,.55);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden}
+body{background:var(--app);color:var(--txt);font:13px/1.45 'DM Sans',system-ui,sans-serif;
+  display:grid;grid-template-rows:46px minmax(0,1fr);grid-template-columns:minmax(0,1fr);
+  user-select:none;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:11px;height:11px}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:7px;border:3px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:var(--dim);background-clip:content-box}
+::-webkit-scrollbar-track{background:transparent}
+.ic{flex:none;display:block}
+.icspace{width:15px;height:15px;display:block;flex:none}
+
+/* ================= buttons ================= */
+button{background:transparent;border:1px solid transparent;color:var(--txt);border-radius:var(--r);
+  padding:6px 10px;font:500 12.5px 'DM Sans';cursor:pointer;white-space:nowrap;
+  display:inline-flex;align-items:center;gap:6px;transition:background .11s,border-color .11s,color .11s}
+button:hover{background:var(--hover)}
+button.on{background:var(--blueSoft);color:var(--blue)}
+button.solid{background:var(--blue);color:#fff;justify-content:center}
+button.solid:hover{background:var(--blue);filter:brightness(1.07)}
+button.bordered{border-color:var(--line)}
+button.bordered:hover{border-color:var(--line2)}
+button.ico{padding:6px;min-width:30px;justify-content:center}
+button.wide{width:100%;margin-top:8px;justify-content:center;border-color:var(--line)}
+button.wide.solid{border-color:var(--blue)}
+button.ghost{border-color:var(--line)}
+button.danger{color:var(--danger)}
+button:disabled{opacity:.3;cursor:default;pointer-events:none}
+
+/* ================= header ================= */
+header{display:flex;align-items:center;gap:3px;padding:0 10px;background:var(--panel);
+  border-bottom:1px solid var(--line);overflow-x:auto;overflow-y:hidden;min-width:0}
+header::-webkit-scrollbar{height:0}
+header>*{flex:none}
+.brand{display:flex;align-items:center;gap:7px;margin:0 8px 0 2px}
+.brand svg{width:22px;height:22px}
+.brand b{font:400 17px/1 'Permanent Marker',cursive;letter-spacing:.2px}
+.sep{width:1px;height:20px;background:var(--line);margin:0 6px}
+.grow{flex:1 1 auto;min-width:8px}
+#docName{font:500 13px 'DM Sans';padding:5px 9px;border-radius:var(--r);outline:none;max-width:220px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:text}
+#docName:hover{background:var(--hover)}
+#docName:focus{background:var(--sunk);box-shadow:inset 0 0 0 1px var(--blue)}
+
+/* ================= shell ================= */
+#shell{display:grid;grid-template-columns:var(--leftW) minmax(0,1fr) var(--rightW);overflow:hidden}
+body.no-left #shell{grid-template-columns:0 minmax(0,1fr) var(--rightW)}
+body.no-right #shell{grid-template-columns:var(--leftW) minmax(0,1fr) 0}
+body.no-left.no-right #shell{grid-template-columns:0 minmax(0,1fr) 0}
+#shell>*{min-width:0;min-height:0}
+aside{background:var(--panel);display:flex;flex-direction:column;overflow:hidden}
+#left{border-right:1px solid var(--line)}
+#right{border-left:1px solid var(--line)}
+body.no-left #left,body.no-right #right{border:0}
+.phead{display:flex;align-items:center;gap:6px;padding:9px 11px;border-bottom:1px solid var(--line);flex:none}
+.phead .ttl{font:600 11px/1 'DM Sans';letter-spacing:.05em;color:var(--dim);text-transform:uppercase}
+.pbody{overflow-y:auto;flex:1;position:relative}
+#lib{padding:10px 11px 30px}
+#insp{padding:0 0 26px}
+.count{font:500 10px 'DM Mono';color:var(--dim);background:var(--sunk);padding:2px 6px;border-radius:99px}
+/* the scroll cue that fixes "I didn't know there was more" */
+.pbody::after{content:'';position:sticky;bottom:0;left:0;display:block;height:26px;pointer-events:none;
+  background:linear-gradient(transparent,var(--panel))}
+
+/* ================= library ================= */
+.searchwrap{padding:9px 11px;border-bottom:1px solid var(--line);flex:none;position:relative}
+.searchwrap .ic{position:absolute;left:20px;top:50%;transform:translateY(-50%);color:var(--dim)}
+#libSearch{width:100%;background:var(--sunk);border:1px solid transparent;color:var(--txt);
+  border-radius:var(--r);padding:7px 10px 7px 32px;font:13px 'DM Sans';outline:none}
+#libSearch:focus{border-color:var(--blue);background:var(--panel)}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+.chip{padding:5px 10px;border:1px solid var(--line);border-radius:99px;font-size:11.5px;color:var(--dim)}
+.chip:hover{color:var(--txt);background:var(--hover)}
+.chip.on{background:var(--txt);color:var(--app);border-color:var(--txt)}
+.libmeta{font:500 10.5px 'DM Sans';color:var(--dim);margin:2px 0 8px}
+.libgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.libcell{border-radius:var(--r);padding:4px;position:relative;border:1px solid var(--line);overflow:hidden;display:block}
+.libcell:hover{border-color:var(--blue);box-shadow:0 0 0 2px var(--blueSoft)}
+.libcell svg{width:100%;display:block;aspect-ratio:1}
+.libcell span{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,rgba(0,0,0,.8));
+  color:#fff;font:500 9px 'DM Sans';padding:9px 3px 3px;text-align:center;opacity:0;transition:.12s;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.libcell:hover span{opacity:1}
+.vgrid{grid-template-columns:repeat(6,1fr)}
+
+/* ================= palette ================= */
+.palbox{padding:9px 11px;border-bottom:1px solid var(--line);max-height:118px;overflow-y:auto;flex:none}
+#pals{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.pal{aspect-ratio:1;border-radius:5px;border:2px solid transparent;padding:0;display:flex;align-items:flex-end;overflow:hidden}
+.pal:hover{outline:1px solid var(--line2)}
+.pal.on{border-color:var(--blue)}
+.pal i{flex:1;height:44%}
+
+/* ================= viewport ================= */
+#viewport{position:relative;overflow:hidden;background:var(--canvas)}
+#viewport[data-cursor="default"]{cursor:default}
+#viewport[data-cursor="move"]{cursor:move}
+#viewport[data-cursor="grab"]{cursor:grab}
+#viewport[data-cursor="grabbing"]{cursor:grabbing}
+#viewport[data-cursor="text"]{cursor:text}
+#viewport[data-cursor="cross"]{cursor:crosshair}
+#viewport[data-cursor="rotate"]{cursor:alias}
+#wrap{position:absolute;left:0;top:0;transform-origin:0 0;box-shadow:var(--shadow)}
+#wrap svg{display:block}
+.dock{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:2px;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--rl);padding:5px;box-shadow:var(--pop);z-index:4}
+.dock .sep{margin:0 4px}
+#zoomLbl{font:500 11.5px 'DM Mono';color:var(--dim);min-width:44px;text-align:center}
+#toast{position:absolute;top:14px;left:50%;transform:translate(-50%,-10px);background:var(--txt);color:var(--app);
+  font:600 12px 'DM Sans';padding:8px 15px;border-radius:99px;opacity:0;transition:.18s;pointer-events:none;z-index:6}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+.hintpill{position:absolute;top:14px;left:50%;transform:translateX(-50%);background:var(--blue);color:#fff;
+  font:600 11.5px 'DM Sans';padding:6px 13px;border-radius:99px;opacity:0;transition:.15s;pointer-events:none;z-index:6}
+.hintpill.on{opacity:1}
+.panelTab{position:absolute;top:10px;width:28px;height:28px;border-radius:var(--r);padding:0;justify-content:center;
+  background:var(--panel);border:1px solid var(--line);color:var(--dim);z-index:5}
+.panelTab:hover{color:var(--txt)}
+#toggleLeft{left:10px} #toggleRight{right:10px}
+.inlineEdit{position:absolute;z-index:7;background:transparent;border:0;outline:2px solid var(--blue);
+  outline-offset:1px;resize:none;overflow:hidden;padding:0;margin:0;caret-color:var(--blue)}
+
+/* ================= inspector ================= */
+.selname{font:600 12.5px 'DM Sans';padding:11px 12px 9px;border-bottom:1px solid var(--line);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grp{border-bottom:1px solid var(--line)}
+.grphead{width:100%;padding:10px 12px;justify-content:flex-start;border-radius:0;
+  font:600 10.5px 'DM Sans';letter-spacing:.05em;text-transform:uppercase;color:var(--dim)}
+.grphead:hover{background:var(--hover);color:var(--txt)}
+.grphead .caret{transition:transform .14s;color:var(--dim)}
+.grp.open .grphead .caret{transform:rotate(0deg)}
+.grp:not(.open) .grphead .caret{transform:rotate(-90deg)}
+.grpbody{display:none;padding:2px 12px 14px}
+.grp.open .grpbody{display:block}
+.hint{color:var(--dim);font-size:12px;line-height:1.6;margin:12px;padding:0}
+.ctl{margin:9px 0}
+.ctop{display:flex;justify-content:space-between;font-size:11.5px;color:var(--dim);margin-bottom:5px}
+.ctop b{color:var(--txt);font-weight:500;font-variant-numeric:tabular-nums}
+.ctl.row2{display:flex;align-items:center;justify-content:space-between;font-size:11.5px;color:var(--dim)}
+input[type=range]{width:100%;-webkit-appearance:none;background:transparent;height:16px;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:3px;background:var(--line);border-radius:3px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;
+  background:var(--panel);border:1.5px solid var(--dim);margin-top:-5.5px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+input[type=range]::-webkit-slider-thumb:hover{border-color:var(--blue)}
+input[type=range]::-moz-range-track{height:3px;background:var(--line);border-radius:3px}
+input[type=range]::-moz-range-thumb{width:13px;height:13px;border:1.5px solid var(--dim);border-radius:50%;background:var(--panel);cursor:pointer}
+select,input[type=number],input[type=text],textarea{width:100%;background:var(--sunk);border:1px solid transparent;
+  color:var(--txt);border-radius:var(--r);padding:7px 9px;font:12.5px 'DM Sans';outline:none}
+select{border-color:var(--line);background:var(--panel)}
+textarea{font-family:'DM Mono',monospace;resize:vertical;min-height:56px;line-height:1.5}
+select:focus,input:focus,textarea:focus{border-color:var(--blue)}
+select.wide{margin-bottom:6px}
+.row{display:flex;gap:6px;margin-top:6px}
+.row>*{flex:1;min-width:0}
+.btnrow{display:flex;gap:5px;margin-top:9px}
+.btnrow button{flex:1;justify-content:center;padding:6px 4px}
+.grid4{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px}
+.field{display:flex;align-items:center;gap:5px;background:var(--sunk);border:1px solid transparent;border-radius:var(--r);padding:0 9px}
+.field:focus-within{border-color:var(--blue);background:var(--panel)}
+.field label{font-size:10.5px;color:var(--dim);width:13px}
+.field input{border:0;background:transparent;padding:7px 0}
+.crow{display:flex;gap:5px;align-items:center}
+.cdot{width:23px;height:23px;border-radius:5px;padding:0;border:2px solid transparent;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.14);min-width:0}
+.cdot.on{border-color:var(--blue)}
+.cpick{width:27px;height:23px;padding:0;border:1px solid var(--line);border-radius:5px;background:transparent;cursor:pointer;flex:none}
+.cpick.wide{width:100%;height:32px}
+.sw{position:relative;display:inline-block;width:32px;height:18px;flex:none}
+.sw input{opacity:0;width:0;height:0}
+.sw i{position:absolute;inset:0;background:var(--line2);border-radius:99px;transition:.15s;cursor:pointer}
+.sw i:before{content:'';position:absolute;width:14px;height:14px;left:2px;top:2px;background:#fff;border-radius:50%;transition:.15s}
+.sw input:checked + i{background:var(--blue)}
+.sw input:checked + i:before{transform:translateX(14px)}
+
+/* ================= layers ================= */
+#layersPane{border-top:1px solid var(--line);height:200px;display:flex;flex-direction:column;flex:none}
+#layers{overflow-y:auto;padding:5px 6px 10px;flex:1}
+.layer{display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:var(--r);cursor:pointer;font-size:12.5px}
+.layer:hover{background:var(--hover)}
+.layer.on{background:var(--blueSoft);color:var(--blue)}
+.layer.dragging{opacity:.4}
+.layer.over{box-shadow:inset 0 2px 0 var(--blue)}
+.layer span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.layer i{display:flex;color:var(--dim)}
+.layer .lgrip{cursor:grab;opacity:.45;transform:rotate(90deg)}
+.layer:hover .lgrip{opacity:.9}
+.lbtn{padding:2px;min-width:0;color:var(--dim);opacity:0;border-radius:4px}
+.layer:hover .lbtn,.lbtn.on{opacity:1}
+.lbtn:hover{color:var(--txt)}
+
+/* ================= context menu ================= */
+#ctxmenu{position:fixed;z-index:60;min-width:216px;background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--rl);box-shadow:var(--pop);padding:5px;display:none}
+#ctxmenu.on{display:block}
+.ctxitem{width:100%;justify-content:flex-start;padding:7px 9px;font-weight:400;font-size:12.5px;gap:9px}
+.ctxitem kbd{margin-left:auto;background:transparent;border:0;color:var(--dim);font:11px 'DM Mono';padding:0}
+.ctxsep{height:1px;background:var(--line);margin:5px 4px}
+.ctxrow{display:flex;align-items:center;gap:9px;padding:5px 9px}
+.ctxlbl{font-size:12.5px;color:var(--dim);min-width:44px}
+.ctxcolors{display:flex;gap:4px}
+.ctxcolors .cdot{width:19px;height:19px}
+
+/* ================= modal ================= */
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.4);backdrop-filter:blur(3px);display:none;
+  align-items:center;justify-content:center;z-index:50;padding:24px}
+#modal.on{display:flex}
+.sheet{background:var(--panel);border:1px solid var(--line);border-radius:14px;width:min(1000px,96vw);
+  max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--pop)}
+.sheet .bar{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.sheet .bar b{font:600 14px 'DM Sans'}
+#modalBody{overflow-y:auto;padding:16px}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:9px 16px;align-items:center}
+kbd{background:var(--sunk);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;
+  padding:3px 8px;font:11.5px 'DM Mono',monospace;color:var(--txt);justify-self:start;white-space:nowrap}
+.keys span{font-size:12.5px;color:var(--dim)}
+
+/* ================= home / files ================= */
+#home{position:fixed;inset:0;z-index:45;background:var(--app);display:none;
+  grid-template-columns:236px minmax(0,1fr);grid-template-rows:56px minmax(0,1fr)}
+#home.on{display:grid}
+.homebar{grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid var(--line)}
+.homeside{border-right:1px solid var(--line);padding:16px 10px;display:flex;flex-direction:column;gap:3px}
+.homeside button{justify-content:flex-start;padding:8px 11px;color:var(--dim);font-weight:500}
+.homeside button:hover{color:var(--txt)}
+.homeside button.on{background:var(--blueSoft);color:var(--blue)}
+.homemain{overflow-y:auto;padding:22px 26px 60px}
+.homemain h2{font:600 19px 'DM Sans';margin:0 0 18px}
+#homeSearch{max-width:280px;background:var(--sunk);border:1px solid transparent;border-radius:var(--r);
+  padding:7px 11px;font:13px 'DM Sans';color:var(--txt);outline:none}
+#homeSearch:focus{border-color:var(--blue)}
+#homeGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(206px,1fr));gap:18px}
+.filecard{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:var(--rl);
+  overflow:hidden;padding:0;text-align:left;display:flex;flex-direction:column;cursor:pointer}
+.filecard:hover{border-color:var(--blue);box-shadow:0 0 0 3px var(--blueSoft)}
+.filecard.cur{border-color:var(--blue)}
+.tplprev{height:172px;background:var(--sunk);display:grid;place-items:center;overflow:hidden;padding:12px}
+.tplprev svg{max-width:100%;max-height:100%;box-shadow:0 2px 10px rgba(0,0,0,.16)}
+.fileinfo{padding:10px 12px;border-top:1px solid var(--line)}
+.fileinfo b{display:block;font:600 12.5px 'DM Sans';overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fileinfo span{display:block;font-size:11px;color:var(--dim);margin-top:2px}
+.filemore{position:absolute;top:8px;right:8px;background:var(--panel);border:1px solid var(--line);
+  padding:4px;min-width:0;opacity:0;border-radius:var(--r)}
+.filecard:hover .filemore{opacity:1}
+
+@media (max-width:1200px){:root{--leftW:240px;--rightW:266px}.libgrid{grid-template-columns:repeat(2,1fr)}#pals{grid-template-columns:repeat(6,1fr)}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3.5 17.5c2-6.5 5-10.5 7-10.5s1.2 6-.5 9.5C8 21 4.6 22 3.5 17.5z"/>
+      <path d="M10.5 13.5c3-4 6-6.5 8-6.5s1.5 3.5-1 6"/>
+      <path d="M15 18c2.5-1 4.5-1.5 6-1.5"/>
+    </svg>
+    <b>Scrawl</b>
+  </div>
+  <button id="btnHome" class="bordered" data-icon="files:15" data-label="Files"></button>
+  <button id="btnNew" class="bordered" data-icon="plus:15" data-label="New"></button>
+  <div class="sep"></div>
+  <div id="docName" contenteditable="true" spellcheck="false" title="Click to rename">Untitled</div>
+  <div class="sep"></div>
+  <button id="btnUndo" class="ico" title="Undo — Ctrl Z" data-icon="undo:16"></button>
+  <button id="btnRedo" class="ico" title="Redo — Ctrl Shift Z" data-icon="redo:16"></button>
+  <div class="sep"></div>
+  <button data-align="l"  class="ico" title="Align left"      data-icon="alignL:16"></button>
+  <button data-align="cx" class="ico" title="Centre across"   data-icon="alignCH:16"></button>
+  <button data-align="r"  class="ico" title="Align right"     data-icon="alignR:16"></button>
+  <button data-align="t"  class="ico" title="Align top"       data-icon="alignT:16"></button>
+  <button data-align="cy" class="ico" title="Centre down"     data-icon="alignCV:16"></button>
+  <button data-align="b"  class="ico" title="Align bottom"    data-icon="alignB:16"></button>
+  <div class="grow"></div>
+  <button id="btnKeys" class="ico" title="Keyboard shortcuts" data-icon="keyboard:16"></button>
+  <button id="themeBtn" class="ico" title="Dark mode"></button>
+  <button id="btnImport" class="ico" title="Place an SVG, or open a project file" data-icon="upload:16"></button>
+  <div class="sep"></div>
+  <button id="btnExport" class="solid" data-icon="download:15" data-label="Export"></button>
+  <input type="file" id="fileIn" accept=".json,.svg,image/svg+xml" hidden>
+</header>
+
+<div id="shell">
+
+  <aside id="left">
+    <div class="phead"><span class="ttl grow">Library</span></div>
+    <div class="searchwrap">
+      <span data-icon="search:15"></span>
+      <input id="libSearch" type="text" placeholder="Search 470+ pieces…" spellcheck="false">
+    </div>
+    <div class="pbody"><div id="lib"></div></div>
+  </aside>
+
+  <main id="viewport" data-cursor="default">
+    <div id="wrap"></div>
+    <button id="toggleLeft" class="panelTab" title="Hide library" data-icon="panelL:15"></button>
+    <button id="toggleRight" class="panelTab" title="Hide properties" data-icon="panelR:15"></button>
+    <div class="dock">
+      <button data-tool="select" class="ico on" title="Select — V" data-icon="cursor:17"></button>
+      <button data-tool="hand"   class="ico" title="Pan — H"      data-icon="hand:17"></button>
+      <button data-tool="text"   class="ico" title="Text — T"     data-icon="text:17"></button>
+      <button data-tool="pen"    class="ico" title="Draw your own — P" data-icon="pen:17"></button>
+      <div class="sep"></div>
+      <button id="btnSurprise" data-icon="sparkle:16" data-label="Surprise"></button>
+      <button id="btnSnap" class="ico" title="Snapping" data-icon="magnet:16"></button>
+      <div class="sep"></div>
+      <button id="btnZoomOut" class="ico" title="Zoom out" data-icon="minus:15"></button>
+      <span id="zoomLbl">100%</span>
+      <button id="btnZoomIn" class="ico" title="Zoom in" data-icon="plus:15"></button>
+      <button id="btnFit" class="ico" title="Fit — 0" data-icon="fit:15"></button>
+    </div>
+    <div id="toast"></div>
+    <div id="editHint" class="hintpill">Editing text — Esc to finish</div>
+    <div id="penHint" class="hintpill">Click to place points · click the first point or press Enter to finish</div>
+    <div id="nodeHint" class="hintpill">Editing points — drag to move, Alt-click to remove, Esc to finish</div>
+  </main>
+
+  <aside id="right">
+    <div class="phead">
+      <span class="ttl grow">Palette</span>
+      <button id="btnPalRand" class="ico" title="Invent a palette" data-icon="sparkle:15"></button>
+    </div>
+    <div class="palbox"><div id="pals"></div></div>
+    <div class="phead"><span class="ttl grow">Properties</span></div>
+    <div class="pbody"><div id="insp"></div></div>
+    <div id="layersPane">
+      <div class="phead"><span class="ttl grow">Layers</span><span class="count" id="layerCount">0</span></div>
+      <div id="layers"></div>
+    </div>
+  </aside>
+
+</div>
+
+<div id="ctxmenu"></div>
+
+<div id="modal">
+  <div class="sheet">
+    <div class="bar">
+      <b id="modalTitle">Title</b>
+      <div class="grow"></div>
+      <span id="modalActions"></span>
+      <button id="modalClose" class="bordered">Close</button>
+    </div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<div id="home">
+  <div class="homebar">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3.5 17.5c2-6.5 5-10.5 7-10.5s1.2 6-.5 9.5C8 21 4.6 22 3.5 17.5z"/>
+        <path d="M10.5 13.5c3-4 6-6.5 8-6.5s1.5 3.5-1 6"/>
+        <path d="M15 18c2.5-1 4.5-1.5 6-1.5"/>
+      </svg>
+      <b>Scrawl</b>
+    </div>
+    <div class="grow"></div>
+    <input id="homeSearch" type="text" placeholder="Search" spellcheck="false">
+    <button id="homeBack" class="bordered" data-icon="close:15" data-label="Back to canvas"></button>
+  </div>
+  <nav class="homeside" id="homeNav">
+    <button data-tab="files" class="on" data-icon="files:16" data-label="Your files"></button>
+    <button data-tab="templates" data-icon="grid:16" data-label="Templates"></button>
+    <div class="grow"></div>
+    <button id="homeNew" class="bordered" data-icon="plus:16" data-label="New design"></button>
+  </nav>
+  <div class="homemain">
+    <h2 id="homeTitle">Your files</h2>
+    <div id="homeFilters" class="chips"></div>
+    <div id="homeGrid"></div>
+  </div>
+</div>
+
+<script src="engine.js"></script>
+<script src="icons.js"></script>
+<script src="gens.js"></script>
+<script src="gens2.js"></script>
+<script src="gens3.js"></script>
+<script src="presets.js"></script>
+<script src="presets2.js"></script>
+<script src="templates.js"></script>
+<script src="templates2.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
