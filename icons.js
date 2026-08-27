@@ -59,6 +59,9 @@
     swatch: 'M4 4h7v16a3.5 3.5 0 0 1-7 0zM11 8.5 15 4.5l4.5 4.5-8.5 8.5M9 17h11v3.5H9',
     type: 'M4 7V5h16v2M12 5v14M9 19h6',
     duplicate: 'M8 8h12v12H8zM4 16V4h12',
+    ungroup: 'M4 4h5v5H4zM15 15h5v5h-5zM9 6.5h6M6.5 9v6',
+    distH: 'M4 3v18M20 3v18M9 8h6v8H9z',
+    distV: 'M3 4h18M3 20h18M8 9v6h8V9z',
     group: 'M4 4h4v4H4zM16 4h4v4h-4zM4 16h4v4H4zM16 16h4v4h-4zM8 6h8M6 8v8M18 8v8M8 18h8',
   };
 

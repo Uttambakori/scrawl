@@ -45,29 +45,39 @@
 
   def('icecream', 'Objects', 'Ice cream', [N('scoops', 'Scoops', 1, 4, 2), O('base', 'Base', ['cone', 'cup', 'stick'], 0), B('drip', 'Drip', false)],
     (h, p) => {
-      const topY = 78 - p.scoops * 15;
-      for (let i = 0; i < p.scoops; i++) {
-        const y = 66 - i * 15, r = 20 - i * 1.5;
-        h.shape(h.ring(50 + (i % 2 ? 3 : -3), y, r, r * .9, 10, 0, .09), { closed: true, role: i % 2 ? 'accent' : 'line' });
-      }
+      // the base first, then scoops stacked so they overlap it and each other
+      const rim = p.base === 2 ? 52 : 60;
       if (p.base === 0) {
-        h.shape([[30, 72], [70, 72], [50, 98]], { closed: true, sharp: true });
-        for (let i = 1; i < 4; i++) { h.line(30 + i * 5, 72 + i * 3, 70 - i * 5, 72 + i * 3, { passes: 1 }); }
+        h.shape([[24, rim], [76, rim], [50, 98]], { closed: true, sharp: true });
+        for (let i = 1; i <= 3; i++) {
+          const u = i / 4;
+          h.line(24 + u * 26, rim + u * 38, 76 - u * 26, rim + u * 38, { passes: 1, op: .8 });
+        }
       }
-      if (p.base === 1) { h.shape([[30, 70], [70, 70], [62, 96], [38, 96]], { closed: true, sharp: true }); h.line(28, 70, 72, 70); }
-      if (p.base === 2) h.line(50, 72, 50, 96);
-      if (p.drip) h.curve([[36, 70], [33, 80], [37, 84], [40, 76]], { closed: true, role: 'accent' });
-      void topY;
+      if (p.base === 1) { h.shape([[26, rim], [74, rim], [64, 96], [36, 96]], { closed: true, sharp: true }); h.line(23, rim, 77, rim); }
+      if (p.base === 2) h.line(50, rim + 6, 50, 97);
+      const step = 17;
+      for (let i = p.scoops - 1; i >= 0; i--) {
+        const r = 21 - i * 1.6;
+        const y = rim - 8 - i * step;
+        h.shape(h.ring(50 + (i % 2 ? 4 : -4), y, r, r * .92, 11, 0, .1), { closed: true, role: i % 2 ? 'accent' : 'line' });
+      }
+      if (p.drip) h.curve([[34, rim - 10], [30, rim + 4], [35, rim + 9], [38, rim - 3]], { closed: true, role: 'accent' });
     });
 
   def('bread', 'Objects', 'Bread', [O('kind', 'Kind', ['loaf', 'baguette', 'roll'], 0), N('slashes', 'Slashes', 0, 6, 3), B('board', 'Board', false)],
     (h, p) => {
       if (p.kind === 1) {
-        h.shape([[8, 62], [24, 34], [50, 26], [76, 34], [92, 62], [76, 76], [50, 80], [24, 76]], { closed: true });
-        for (let i = 0; i < p.slashes; i++) { const x = 26 + i * (48 / Math.max(1, p.slashes)); h.line(x, 46, x + 10, 38); }
+        // long and low, or it looks like every other loaf
+        h.shape([[4, 54], [16, 42], [50, 38], [84, 42], [96, 54], [84, 66], [50, 70], [16, 66]], { closed: true });
+        for (let i = 0; i < p.slashes; i++) {
+          const x = 20 + (i + .5) * (60 / Math.max(1, p.slashes));
+          h.line(x - 5, 58, x + 5, 46);
+        }
       } else if (p.kind === 2) {
-        h.shape(h.ring(50, 56, 30, 24, 11, 0, .07), { closed: true });
-        for (let i = 0; i < p.slashes; i++) h.curve([[34 + i * 8, 44], [40 + i * 8, 40]], { passes: 1 });
+        h.shape(h.ring(50, 56, 27, 23, 11, 0, .07), { closed: true });
+        h.curve([[34, 46], [66, 66]], { passes: 1 });
+        h.curve([[66, 46], [34, 66]], { passes: 1 });
       } else {
         h.shape([[16, 78], [16, 50], [26, 34], [50, 28], [74, 34], [84, 50], [84, 78]], { closed: true });
         h.line(14, 78, 86, 78);

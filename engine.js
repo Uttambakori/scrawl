@@ -24,6 +24,25 @@ function hashStr(s) {
 const n2 = v => Math.round(v * 100) / 100;
 const TAU = Math.PI * 2;
 
+
+/* Bounding box of drawn output, read straight off the path data.
+   Every command this engine emits (M / C / L) carries absolute x y
+   pairs, so alternating the numbers is enough — and it means anything
+   drawn can be measured without the generator knowing its own size. */
+function bboxOfStrokes(strokes) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  strokes.forEach(st => {
+    const n = st.d.match(/-?\d+(?:\.\d+)?/g);
+    if (!n) return;
+    for (let i = 0; i + 1 < n.length; i += 2) {
+      const x = +n[i], y = +n[i + 1];
+      if (x < x0) x0 = x; if (x > x1) x1 = x;
+      if (y < y0) y0 = y; if (y > y1) y1 = y;
+    }
+  });
+  return isFinite(x0) ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;
+}
+
 /* ------------------------------------------------------------
    Hand
    Draws into a 0..100 x 0..100 local box (y down).
@@ -258,6 +277,74 @@ class Hand {
     return this;
   }
 
+
+  /* Draw something once into a throwaway hand to find out how big it is,
+     then draw it for real, scaled and centred inside `box`.
+
+     Generators otherwise have to know their own extent in advance, which
+     is impossible the moment a figure can hold a pot over its head or
+     raise its arms — the same pose is a different size. `draw` is called
+     as draw(hand, cx, cy, scale). */
+  fitDraw(box, draw, o = {}) {
+    const probe = new Hand(this.seed, {
+      rough: this.rough, bow: this.bow, passes: this.passes,
+      fillMode: 'none', fillGap: this.fillGap, fillAngle: this.fillAngle,
+    });
+    draw(probe, 0, 0, 1);
+    const bb = bboxOfStrokes(probe.strokes);
+    if (!bb || bb.w <= 0 || bb.h <= 0) { draw(this, box.x + box.w / 2, box.y + box.h / 2, 1); return this; }
+    const pad = o.pad ?? 0.96;
+    const s = Math.min(box.w / bb.w, box.h / bb.h) * pad * (o.scale ?? 1);
+    draw(this,
+      box.x + box.w / 2 - (bb.x + bb.w / 2) * s,
+      box.y + box.h / 2 - (bb.y + bb.h / 2) * s, s);
+    return this;
+  }
+
+  /* Draw something into a throwaway hand, then move the finished paths
+     into THIS hand, scaled and centred inside `box`.
+
+     `fitDraw` above can only offer the generator a scale factor, which is
+     no help when the thing being placed doesn't take one — and no help at
+     all when the cell is going to be stretched later. `stamp` rewrites the
+     path data instead, so anything drawable can be dropped into any cell.
+
+       o.ar    the box will be stretched by this much horizontally when it
+               is rendered, so squeeze x by the same amount and the motif
+               comes out undistorted
+       o.pad   fraction of the cell to fill (default 0.9)
+       o.fill  stretch to fill the cell instead of fitting inside it */
+  stamp(box, draw, o = {}) {
+    const probe = new Hand((this.seed ^ 0x9e3779b9) >>> 0, {
+      rough: this.rough, bow: this.bow, passes: this.passes,
+      fillMode: this.fillMode, fillGap: this.fillGap, fillAngle: this.fillAngle,
+    });
+    draw(probe);
+    const bb = bboxOfStrokes(probe.strokes);
+    if (!bb || bb.w <= 0 || bb.h <= 0) return this;
+    const ar = o.ar || 1, pad = o.pad ?? 0.9;
+    let sx, sy;
+    if (o.fill) { sx = box.w / bb.w; sy = box.h / bb.h; }
+    else { sy = Math.min((box.w * ar) / bb.w, box.h / bb.h) * pad; sx = sy / ar; }
+    const ox = box.x + box.w / 2 - (bb.x + bb.w / 2) * sx;
+    const oy = box.y + box.h / 2 - (bb.y + bb.h / 2) * sy;
+    const map = d => {
+      let i = 0;
+      return d.replace(/-?\d+(?:\.\d+)?/g, m => {
+        const v = parseFloat(m);
+        return n2((i++ % 2 === 0) ? v * sx + ox : v * sy + oy);
+      });
+    };
+    const wk = Math.sqrt(Math.abs(sx * sy)) || 1;
+    probe.strokes.forEach(st => {
+      st.d = map(st.d);
+      st.clip = st.clip ? map(st.clip) : this._clip;
+      st.w *= wk;
+      this.strokes.push(st);
+    });
+    return this;
+  }
+
   /* --- point helpers ---------------------------------------- */
   ring(cx, cy, rx, ry, n, rot = 0, wob = 0) {
     const p = [];
@@ -276,4 +363,4 @@ class Hand {
   }
 }
 
-window.SCRAWL = { rngFrom, hashStr, Hand, TAU };
+window.SCRAWL = { rngFrom, hashStr, Hand, TAU, bboxOfStrokes, n2 };

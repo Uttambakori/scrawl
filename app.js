@@ -32,23 +32,105 @@
   let doc = null, sel = new Set(), view = { z: 1, ox: 0, oy: 0 };
   let history = [], hi = -1, editing = null, guides = [], pen = null;
   let tool = 'select', snapOn = true;
+  const penOpts = { smooth: 1, closed: 1 };
 
   const presetByName = n => PRESETS.find(p => p.name === n);
   function baseWeight(d) { const dd = d || doc; return +(((dd ? dd.w + dd.h : 2160) / 2) / 1080 * 3.2).toFixed(2); }
   function defaultStyle(d) {
-    return { stroke: 0, fill: 4, accent: 1, weight: baseWeight(d), rough: 1.1, bow: 1, passes: 2, fillMode: 'none', fillGap: 4.5, fillAngle: -40, opacity: 1, wobble: 0 };
+    const hh = (S.STYLES && S.styleOf(libStyle).hand) || { rough: 1.1, bow: 1, passes: 2, weight: 3.2, fillMode: 'none' };
+    return {
+      stroke: 0, fill: 4, accent: 1,
+      weight: +(baseWeight(d) * (hh.weight / 3.2)).toFixed(2),
+      rough: hh.rough, bow: hh.bow, passes: hh.passes,
+      fillMode: hh.fillMode, fillGap: 4.5, fillAngle: -40, opacity: 1, wobble: 0,
+    };
   }
   function fitBox(genKey, box) {
     const g = GENS[genKey];
-    if (!g || g.aspect === 'free') return box;
+    if (!g) return box;
+    /* free pieces know the shape they want to arrive at — a border is
+       born long, a frame is born big, instead of everything landing
+       as the same square */
+    if (g.aspect === 'free') {
+      if (!g.place) return box;
+      const w = doc ? doc.w * g.place.w : box.w * 2 * g.place.w;
+      const h = doc ? doc.h * g.place.h : box.h * 2 * g.place.h;
+      return { x: box.x + box.w / 2 - w / 2, y: box.y + box.h / 2 - h / 2, w, h };
+    }
     const s = Math.min(box.w, box.h);
     return { x: box.x + (box.w - s) / 2, y: box.y + (box.h - s) / 2, w: s, h: s };
   }
   function paletteAt(i) { const p = PALETTES[i % PALETTES.length]; return { name: p[0], paper: p[1], colors: [p[2], p[3], p[4], p[5], p[1]] }; }
 
   function newDoc(w = 1080, h = 1350, palIdx = 0, name = 'Untitled') {
-    const p = paletteAt(palIdx);
-    return { id: 'd' + uid(), name, w, h, palIdx, paper: p.paper, colors: p.colors.slice(), texture: 'grain', textureAmt: .12, textureScale: 1, items: [] };
+    const bk = brand();
+    const p = bk ? { paper: bk.paper, colors: bk.colors } : paletteAt(palIdx);
+    return {
+      id: 'd' + uid(), name, w, h, palIdx: bk ? -1 : palIdx,
+      paper: p.paper, colors: p.colors.slice(), texture: 'grain', textureAmt: .12, textureScale: 1,
+      items: [], boards: [{ id: 'b' + uid(), name: 'Board 1', x: 0, y: 0, w, h }], active: 0,
+    };
+  }
+
+  /* ---------------- artboards ----------------
+     Boards are rectangles on one infinite canvas. Items carry absolute
+     coordinates and simply sit wherever they sit; a board is the paper under
+     them and the region an export crops to. doc.w/doc.h track the active one
+     so every existing size control keeps working. */
+  function migrateBoards(d) {
+    if (!d.boards || !d.boards.length) {
+      d.boards = [{ id: 'b' + uid(), name: 'Board 1', x: 0, y: 0, w: d.w, h: d.h }];
+      d.active = 0;
+    }
+    d.active = clamp(d.active | 0, 0, d.boards.length - 1);
+    const b = d.boards[d.active];
+    d.w = b.w; d.h = b.h;
+    return d;
+  }
+  const board = () => doc.boards[doc.active];
+  function syncActiveBoard() { const b = board(); if (b) { b.w = doc.w; b.h = doc.h; } }
+
+  function boardsBounds(d) {
+    const bs = (d || doc).boards;
+    return {
+      x: Math.min(...bs.map(b => b.x)), y: Math.min(...bs.map(b => b.y)),
+      r: Math.max(...bs.map(b => b.x + b.w)), b: Math.max(...bs.map(b => b.y + b.h)),
+    };
+  }
+
+  function addBoard(preset) {
+    const bs = doc.boards;
+    const bb = boardsBounds();
+    const src = board();
+    const w = preset ? preset[1] : src.w, h = preset ? preset[2] : src.h;
+    const nb = { id: 'b' + uid(), name: 'Board ' + (bs.length + 1), x: bb.r + 80, y: bb.y, w, h };
+    bs.push(nb);
+    doc.active = bs.length - 1; doc.w = w; doc.h = h;
+    sel.clear(); commit(); render(); fitView(); refreshPanels();
+    toast('Added ' + nb.name);
+  }
+  function removeBoard(i) {
+    if (doc.boards.length < 2) { toast('A file needs at least one board'); return; }
+    const b = doc.boards[i];
+    if (!confirm(`Delete "${b.name}"? Anything on it stays on the canvas.`)) return;
+    doc.boards.splice(i, 1);
+    doc.active = clamp(doc.active, 0, doc.boards.length - 1);
+    const a = board(); doc.w = a.w; doc.h = a.h;
+    commit(); render(); fitView(); refreshPanels();
+  }
+  function setActiveBoard(i) {
+    if (i === doc.active) return;
+    doc.active = i;
+    const b = board(); doc.w = b.w; doc.h = b.h;
+    render(); refreshPanels();
+  }
+  /* which board is under a point — used so clicking empty paper switches board */
+  function boardAt(p) {
+    for (let i = doc.boards.length - 1; i >= 0; i--) {
+      const b = doc.boards[i];
+      if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) return i;
+    }
+    return -1;
   }
   function makeItem(genKey, box, d) {
     const g = GENS[genKey], params = {};
@@ -68,11 +150,17 @@
   /* ---------------- stroke cache ---------------- */
   const cache = new Map();
   function strokesFor(it) {
-    const k = it.gen + '|' + it.seed + '|' + JSON.stringify(it.params) + '|' + it.st.rough + '|' + it.st.bow + '|' + it.st.passes + '|' + it.st.fillMode + '|' + it.st.fillGap + '|' + it.st.fillAngle;
+    const g = GENS[it.gen];
+    // A free-aspect item scales x and y differently, which squashes whatever it
+    // contains. Hand the generator its aspect so it can compensate.
+    const free = g.aspect === 'free';
+    const ar = free ? Math.max(.05, Math.min(20, (it.w || 1) / (it.h || 1))) : 1;
+    const k = it.gen + '|' + it.seed + '|' + JSON.stringify(it.params) + '|' + (free ? ar.toFixed(2) : '') + '|' + it.st.rough + '|' + it.st.bow + '|' + it.st.passes + '|' + it.st.fillMode + '|' + it.st.fillGap + '|' + it.st.fillAngle;
     if (cache.has(k)) return cache.get(k);
     const h = new Hand(it.seed, { rough: it.st.rough, bow: it.st.bow, passes: it.st.passes, fillMode: it.st.fillMode, fillGap: it.st.fillGap, fillAngle: it.st.fillAngle });
-    if (GENS[it.gen].cat === 'Patterns') h.clipStart('M0 0H100V100H0Z');
-    try { GENS[it.gen].draw(h, it.params); } catch (e) { console.warn('gen', it.gen, e); }
+    if (g.cat === 'Patterns') h.clipStart('M0 0H100V100H0Z');
+    const params = free ? Object.assign({}, it.params, { _ar: ar }) : it.params;
+    try { g.draw(h, params); } catch (e) { console.warn('gen', it.gen, e); }
     h.clipEnd();
     if (cache.size > 1400) cache.clear();
     cache.set(k, h.strokes);
@@ -87,9 +175,34 @@
     d = d || doc;
     if (it.hidden) return '';
     const cx = it.x + it.w / 2, cy = it.y + it.h / 2;
-    const T = `translate(${cx} ${cy}) rotate(${it.rot}) translate(${-it.w / 2} ${-it.h / 2})`;
+    const FL = (it.flipX || it.flipY) ? ` scale(${it.flipX ? -1 : 1} ${it.flipY ? -1 : 1})` : '';
+    const T = `translate(${cx} ${cy}) rotate(${it.rot})${FL} translate(${-it.w / 2} ${-it.h / 2})`;
     const filt = it.st.wobble > 0 ? ` filter="url(#w${NS}_${it.id})"` : '';
     const op = ` opacity="${it._edit ? 0 : it.st.opacity}"`;
+
+    if (it.type === 'text' && it.arc) {
+      // text on a path: a circular arc, which is what badges and seals want
+      const fs = it.size, r = Math.min(it.w, it.h) / 2 - fs * .1;
+      const sweep = Math.max(10, Math.min(350, it.arcSweep || 180));
+      const flip = it.arcFlip ? 1 : 0;
+      const cx = it.w / 2, cy = it.h / 2;
+      // top text runs clockwise over the top; bottom text runs the other way
+      // under the bottom, so it still reads left to right and stays upright
+      const mid = flip ? 90 : -90, half = sweep / 2;
+      const A0 = flip ? mid + half : mid - half;
+      const A1 = flip ? mid - half : mid + half;
+      const a0 = A0 * Math.PI / 180, a1 = A1 * Math.PI / 180;
+      const rr = flip ? r - fs * .9 : r;
+      const p0 = [cx + Math.cos(a0) * rr, cy + Math.sin(a0) * rr];
+      const p1 = [cx + Math.cos(a1) * rr, cy + Math.sin(a1) * rr];
+      const large = sweep > 180 ? 1 : 0;
+      const pid = 'arc' + NS + '_' + it.id;
+      const arcD = `M${p0[0].toFixed(2)} ${p0[1].toFixed(2)}A${rr.toFixed(2)} ${rr.toFixed(2)} 0 ${large} ${flip ? 0 : 1} ${p1[0].toFixed(2)} ${p1[1].toFixed(2)}`;
+      const words = esc(it.caps ? String(it.text).toUpperCase() : String(it.text)).replace(/\n/g, ' ');
+      return `<g data-id="${it.id}" transform="${T}"${filt}${op}><defs><path id="${pid}" d="${arcD}"/></defs>` +
+        `<text font-size="${fs.toFixed(2)}" letter-spacing="${(it.letter * fs / 100).toFixed(2)}" fill="${col(it.st.stroke, d)}" style="font-family:'${it.font}',sans-serif">` +
+        `<textPath href="#${pid}" startOffset="50%" text-anchor="middle">${words}</textPath></text></g>`;
+    }
 
     if (it.type === 'text') {
       const lines = String(it.text).split('\n'), fs = it.size;
@@ -108,7 +221,7 @@
     const avg = (Math.abs(it.w) + Math.abs(it.h)) / 200 || 1;
     const sw = it.st.weight / avg;
     let clips = '', body = '';
-    strokesFor(it).forEach(st => {
+    (it.type === 'path' ? it.strokes : strokesFor(it)).forEach(st => {
       let ca = '';
       if (st.clip) { const id = 'c' + NS + (clipN++); clips += `<clipPath id="${id}"><path d="${st.clip}"/></clipPath>`; ca = ` clip-path="url(#${id})"`; }
       const stroke = col(st.role === 'accent' ? it.st.accent : st.role === 'fill' ? it.st.fill : it.st.stroke, d);
@@ -126,7 +239,7 @@
       const oct = { grain: 4, rough: 5, fibre: 3, blotch: 2 }[t];
       return {
         defs: `<filter id="tex${NS}" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="${bf}" numOctaves="${oct}" seed="7"/><feColorMatrix type="saturate" values="0"/></filter>`,
-        rect: `<rect width="${d.w}" height="${d.h}" filter="url(#tex${NS})" opacity="${d.textureAmt}" style="mix-blend-mode:multiply"/>`
+        rect: b => `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" filter="url(#tex${NS})" opacity="${d.textureAmt}" style="mix-blend-mode:multiply"/>`
       };
     }
     const g = 14 * s, c = d.colors[0];
@@ -135,7 +248,10 @@
     if (t === 'grid') inner = `<path d="M0 0H${g}M0 0V${g}" stroke="${c}" stroke-width="${.7 * s}" fill="none"/>`;
     if (t === 'lines') inner = `<path d="M0 ${g / 2}H${g}" stroke="${c}" stroke-width="${.7 * s}" fill="none"/>`;
     if (t === 'crosshatch') inner = `<path d="M0 0L${g} ${g}M${g} 0L0 ${g}" stroke="${c}" stroke-width="${.6 * s}" fill="none"/>`;
-    return { defs: `<pattern id="tex${NS}" width="${g}" height="${g}" patternUnits="userSpaceOnUse">${inner}</pattern>`, rect: `<rect width="${d.w}" height="${d.h}" fill="url(#tex${NS})" opacity="${d.textureAmt * 3}"/>` };
+    return {
+      defs: `<pattern id="tex${NS}" width="${g}" height="${g}" patternUnits="userSpaceOnUse">${inner}</pattern>`,
+      rect: b => `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="url(#tex${NS})" opacity="${d.textureAmt * 3}"/>`
+    };
   }
 
   function wobDefs(d) {
@@ -143,14 +259,24 @@
       `<filter id="w${NS}_${i.id}" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency="${(.006 + i.st.wobble * .0016).toFixed(4)}" numOctaves="2" seed="${i.id % 9999}" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="${(i.st.wobble * 1.4).toFixed(2)}" xChannelSelector="R" yChannelSelector="G"/></filter>`).join('');
   }
 
-  function buildSVG(d, forExport) {
-    d = d || doc; clipN = 0; NS = forExport ? 'x' + (++nsN) : 's';
+  /* `crop` limits the output to one board; without it you get every board.
+     `viewRect` widens the visible area beyond that, which print needs so the
+     crop marks have somewhere to sit. */
+  function buildSVG(d, forExport, crop, viewRect) {
+    d = migrateBoards(d || doc); clipN = 0; NS = forExport ? 'x' + (++nsN) : 's';
     const tex = texDefs(d);
-    return `<svg xmlns="http://www.w3.org/2000/svg" ${forExport ? '' : 'id="stage" '}width="${d.w}" height="${d.h}" viewBox="0 0 ${d.w} ${d.h}">
+    const bb = boardsBounds(d);
+    const view = viewRect ? viewRect : crop
+      ? { x: crop.x, y: crop.y, w: crop.w, h: crop.h }
+      : { x: bb.x, y: bb.y, w: bb.r - bb.x, h: bb.b - bb.y };
+    const boards = crop ? [crop] : d.boards;
+    const paper = boards.map(b => `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="${d.paper}"/>`).join('');
+    const grain = tex.rect ? boards.map(b => tex.rect(b)).join('') : '';
+    return `<svg xmlns="http://www.w3.org/2000/svg" ${forExport ? '' : 'id="stage" '}width="${Math.round(view.w)}" height="${Math.round(view.h)}" viewBox="${view.x} ${view.y} ${view.w} ${view.h}">
 <defs>${tex.defs}${wobDefs(d)}</defs>
-<rect width="${d.w}" height="${d.h}" fill="${d.paper}"/>
+${paper}
 ${forExport ? '<g>' : '<g id="art">'}${d.items.map(i => itemMarkup(i, d)).join('')}</g>
-${tex.rect}
+${grain}
 ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   }
 
@@ -170,7 +296,8 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
 
   function fitTexts() {
     const svg = $('#stage'); if (!svg) return;
-    doc.items.filter(i => i.type === 'text' && !i.hidden).forEach(it => {
+    // arc text sizes itself off its box, so neither fit nor tighten apply
+    doc.items.filter(i => i.type === 'text' && !i.hidden && !i.arc).forEach(it => {
       // 1. `fit` runs once, when the item is first laid into a slot: pick the
       //    type size that fills it. After that the size is the user's.
       if (it.fit) {
@@ -216,33 +343,35 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
 
   /* ---------------- viewport ---------------- */
   function applyView() {
-    const w = $('#wrap');
+    const w = $('#wrap'), bb = boardsBounds();
     w.style.transform = `translate(${view.ox}px,${view.oy}px) scale(${view.z})`;
-    w.style.width = doc.w + 'px'; w.style.height = doc.h + 'px';
+    w.style.width = (bb.r - bb.x) + 'px'; w.style.height = (bb.b - bb.y) + 'px';
   }
   function fitView() {
-    const vp = $('#viewport').getBoundingClientRect();
-    view.z = Math.min((vp.width - 120) / doc.w, (vp.height - 140) / doc.h);
-    view.ox = (vp.width - doc.w * view.z) / 2;
-    view.oy = (vp.height - doc.h * view.z) / 2 - 12;
+    const vp = $('#viewport').getBoundingClientRect(), bb = boardsBounds();
+    const W = bb.r - bb.x, H = bb.b - bb.y;
+    view.z = Math.min((vp.width - 120) / W, (vp.height - 140) / H);
+    view.ox = (vp.width - W * view.z) / 2 - bb.x * view.z;
+    view.oy = (vp.height - H * view.z) / 2 - 12 - bb.y * view.z;
     applyView(); drawUI();
     $('#zoomLbl').textContent = Math.round(view.z * 100) + '%';
   }
   function toDoc(e) {
-    const r = $('#viewport').getBoundingClientRect();
-    return { x: (e.clientX - r.left - view.ox) / view.z, y: (e.clientY - r.top - view.oy) / view.z };
+    const r = $('#viewport').getBoundingClientRect(), bb = boardsBounds();
+    return { x: (e.clientX - r.left - view.ox) / view.z + bb.x, y: (e.clientY - r.top - view.oy) / view.z + bb.y };
   }
   function toScreen(x, y) {
-    const r = $('#viewport').getBoundingClientRect();
-    return { x: r.left + view.ox + x * view.z, y: r.top + view.oy + y * view.z };
+    const r = $('#viewport').getBoundingClientRect(), bb = boardsBounds();
+    return { x: r.left + view.ox + (x - bb.x) * view.z, y: r.top + view.oy + (y - bb.y) * view.z };
   }
 
   /* ==========================================================
      SMART GUIDES — Figma-style snapping
      ========================================================== */
   function snapTargets(excludeIds) {
-    const V = [{ v: 0 }, { v: doc.w / 2 }, { v: doc.w }];
-    const H = [{ v: 0 }, { v: doc.h / 2 }, { v: doc.h }];
+    const b = board();
+    const V = [{ v: b.x }, { v: b.x + b.w / 2 }, { v: b.x + b.w }];
+    const H = [{ v: b.y }, { v: b.y + b.h / 2 }, { v: b.y + b.h }];
     doc.items.forEach(it => {
       if (excludeIds.has(it.id) || it.hidden) return;
       V.push({ v: it.x, it }, { v: it.x + it.w / 2, it }, { v: it.x + it.w, it });
@@ -275,57 +404,69 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
 
   /* ---------------- selection chrome ---------------- */
   const HANDLES = [[0, 0], [.5, 0], [1, 0], [1, .5], [1, 1], [.5, 1], [0, 1], [0, .5]];
+  /* canvas chrome reads from the same palette as the interface */
+  const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  let SEL = '#2B5FD9', GUIDE = '#D2432B';
+  function syncChromeColours() { SEL = css('--accent') || SEL; GUIDE = css('--guide') || GUIDE; }
   function drawUI() {
     const ui = $('#ui'); if (!ui) return;
     const k = 1 / view.z; let s = '';
 
     guides.forEach(g => {
-      if (g.x !== undefined) s += `<line x1="${g.x}" y1="${-4000}" x2="${g.x}" y2="${doc.h + 4000}" stroke="#F24822" stroke-width="${1 * k}"/>`;
-      else s += `<line x1="${-4000}" y1="${g.y}" x2="${doc.w + 4000}" y2="${g.y}" stroke="#F24822" stroke-width="${1 * k}"/>`;
+      if (g.x !== undefined) s += `<line x1="${g.x}" y1="${-4000}" x2="${g.x}" y2="${doc.h + 4000}" stroke="${GUIDE}" stroke-width="${1 * k}"/>`;
+      else s += `<line x1="${-4000}" y1="${g.y}" x2="${doc.w + 4000}" y2="${g.y}" stroke="${GUIDE}" stroke-width="${1 * k}"/>`;
     });
 
     doc.items.forEach(it => {
       if (!sel.has(it.id)) return;
       const cx = it.x + it.w / 2, cy = it.y + it.h / 2;
       s += `<g transform="translate(${cx} ${cy}) rotate(${it.rot})">
-        <rect x="${-it.w / 2}" y="${-it.h / 2}" width="${it.w}" height="${it.h}" fill="none" stroke="#0D99FF" stroke-width="${1.5 * k}"/>`;
+        <rect x="${-it.w / 2}" y="${-it.h / 2}" width="${it.w}" height="${it.h}" fill="none" stroke="${SEL}" stroke-width="${1.5 * k}"/>`;
       if (sel.size === 1 && !it.locked && !editing) {
         const hs = 8 * k;
         HANDLES.forEach(([hx, hy]) => {
-          s += `<rect x="${-it.w / 2 + it.w * hx - hs / 2}" y="${-it.h / 2 + it.h * hy - hs / 2}" width="${hs}" height="${hs}" rx="${1.5 * k}" fill="#fff" stroke="#0D99FF" stroke-width="${1.4 * k}"/>`;
+          s += `<rect x="${-it.w / 2 + it.w * hx - hs / 2}" y="${-it.h / 2 + it.h * hy - hs / 2}" width="${hs}" height="${hs}" rx="${1.5 * k}" fill="#fff" stroke="${SEL}" stroke-width="${1.4 * k}"/>`;
         });
-        s += `<line x1="0" y1="${-it.h / 2}" x2="0" y2="${-it.h / 2 - 26 * k}" stroke="#0D99FF" stroke-width="${1.4 * k}"/><circle cx="0" cy="${-it.h / 2 - 30 * k}" r="${5.5 * k}" fill="#fff" stroke="#0D99FF" stroke-width="${1.4 * k}"/>`;
+        s += `<line x1="0" y1="${-it.h / 2}" x2="0" y2="${-it.h / 2 - 26 * k}" stroke="${SEL}" stroke-width="${1.4 * k}"/><circle cx="0" cy="${-it.h / 2 - 30 * k}" r="${5.5 * k}" fill="#fff" stroke="${SEL}" stroke-width="${1.4 * k}"/>`;
       }
       s += '</g>';
     });
 
-    // Figma-style dimension badge
-    if (sel.size === 1 && !editing) {
-      const it = doc.items.find(i => sel.has(i.id));
-      if (it) {
-        const bw = 58 * k, bh = 17 * k;
-        const bx = it.x + it.w / 2 - bw / 2, by = it.y + it.h + 8 * k;
-        s += `<g><rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="${3 * k}" fill="#0D99FF"/>
-          <text x="${bx + bw / 2}" y="${by + bh * .72}" font-size="${11 * k}" fill="#fff" text-anchor="middle" style="font-family:'DM Sans',sans-serif;font-weight:500">${Math.round(it.w)} × ${Math.round(it.h)}</text></g>`;
-      }
+
+    // an empty page should say what to do next
+    if (!doc.items.length && !pen) {
+      const cx = doc.w / 2, cy = doc.h / 2, fs = 15 * k;
+      s += `<g opacity=".45" style="font-family:'DM Sans',sans-serif">
+        <text x="${cx}" y="${cy - fs * .6}" font-size="${fs}" text-anchor="middle" fill="${doc.colors[0]}">Click a piece in the Library to place it</text>
+        <text x="${cx}" y="${cy + fs * 1.1}" font-size="${fs * .88}" text-anchor="middle" fill="${doc.colors[0]}">or press ✦ Surprise for a whole composition</text>
+      </g>`;
     }
 
-    if (marquee) s += `<rect x="${Math.min(marquee.x0, marquee.x1)}" y="${Math.min(marquee.y0, marquee.y1)}" width="${Math.abs(marquee.x1 - marquee.x0)}" height="${Math.abs(marquee.y1 - marquee.y0)}" fill="#0D99FF22" stroke="#0D99FF" stroke-width="${1.2 * k}"/>`;
+    if (marquee) s += `<rect x="${Math.min(marquee.x0, marquee.x1)}" y="${Math.min(marquee.y0, marquee.y1)}" width="${Math.abs(marquee.x1 - marquee.x0)}" height="${Math.abs(marquee.y1 - marquee.y0)}" fill="${SEL}22" stroke="${SEL}" stroke-width="${1.2 * k}"/>`;
 
     if (nodeEdit) {
-      const pts = nodeEdit.params._pts || [];
-      const d = pts.map((q, i) => { const P = genToDoc(nodeEdit, q[0], q[1]); return (i ? 'L' : 'M') + P.x + ' ' + P.y; }).join('');
-      s += `<path d="${d}${nodeEdit.params.closed ? 'Z' : ''}" fill="none" stroke="#0D99FF" stroke-width="${1.3 * k}" stroke-dasharray="${4 * k} ${3 * k}"/>`;
-      pts.forEach((q, i) => {
-        const P = genToDoc(nodeEdit, q[0], q[1]);
-        s += `<rect x="${P.x - 5 * k}" y="${P.y - 5 * k}" width="${10 * k}" height="${10 * k}" rx="${5 * k}" fill="${i === dragNode ? '#0D99FF' : '#fff'}" stroke="#0D99FF" stroke-width="${1.6 * k}"/>`;
+      if (nodeEdit.gen === 'custom') {
+        const pts = nodeEdit.params._pts || [];
+        const d = pts.map((q, i) => { const P = genToDoc(nodeEdit, q[0], q[1]); return (i ? 'L' : 'M') + P.x + ' ' + P.y; }).join('');
+        s += `<path d="${d}${nodeEdit.params.closed ? 'Z' : ''}" fill="none" stroke="${SEL}" stroke-width="${1.2 * k}" stroke-dasharray="${4 * k} ${3 * k}"/>`;
+      }
+      if (nodeEdit.type === 'path' && nodeEdit.strokes[activeStroke]) {
+        s += `<path d="${nodeEdit.strokes[activeStroke].d}" fill="none" stroke="${SEL}" stroke-width="${1.6 * k * 100 / nodeEdit.w}" opacity=".9" transform="translate(${nodeEdit.x} ${nodeEdit.y}) scale(${nodeEdit.w / 100} ${nodeEdit.h / 100})"/>`;
+      }
+      const r = (nodeList.length > 60 ? 3.6 : 4.8) * k;
+      nodeList.forEach((h, i) => {
+        const P = genToDoc(nodeEdit, h.x, h.y);
+        s += `<circle cx="${P.x}" cy="${P.y}" r="${i === dragNode ? r * 1.5 : r}" fill="${i === dragNode ? '${SEL}' : '#fff'}" stroke="${SEL}" stroke-width="${1.5 * k}"/>`;
       });
     }
 
-    if (pen && pen.pts.length) {
+    if (pen && pen.pts.length > 1 && pen.free) {
+      const d = pen.pts.map((q, i) => (i ? 'L' : 'M') + q.x + ' ' + q.y).join('');
+      s += `<path d="${d}" fill="none" stroke="${SEL}" stroke-width="${1.8 * k}" stroke-linecap="round" stroke-linejoin="round"/>`;
+    } else if (pen && pen.pts.length) {
       const d = pen.pts.map((p, i) => (i ? 'L' : 'M') + p.x + ' ' + p.y).join('');
-      s += `<path d="${d}${pen.hover ? 'L' + pen.hover.x + ' ' + pen.hover.y : ''}" fill="none" stroke="#0D99FF" stroke-width="${1.6 * k}" stroke-dasharray="${5 * k} ${4 * k}"/>`;
-      pen.pts.forEach((p, i) => s += `<circle cx="${p.x}" cy="${p.y}" r="${(i === 0 ? 6 : 4) * k}" fill="#fff" stroke="#0D99FF" stroke-width="${1.6 * k}"/>`);
+      s += `<path d="${d}${pen.hover ? 'L' + pen.hover.x + ' ' + pen.hover.y : ''}" fill="none" stroke="${SEL}" stroke-width="${1.6 * k}" stroke-dasharray="${5 * k} ${4 * k}"/>`;
+      pen.pts.forEach((p, i) => s += `<circle cx="${p.x}" cy="${p.y}" r="${(i === 0 ? 6 : 4) * k}" fill="#fff" stroke="${SEL}" stroke-width="${1.6 * k}"/>`);
     }
     ui.innerHTML = s;
   }
@@ -371,7 +512,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     const vp = $('#viewport');
     if (drag) { vp.dataset.cursor = drag.mode === 'pan' ? 'grabbing' : drag.mode === 'move' ? 'grabbing' : 'default'; return; }
     if (tool === 'hand' || space) { vp.dataset.cursor = 'grab'; return; }
-    if (tool === 'pen') { vp.dataset.cursor = 'cross'; return; }
+    if (tool === 'pen' || tool === 'pencil') { vp.dataset.cursor = 'cross'; return; }
     if (tool === 'text') { vp.dataset.cursor = 'text'; return; }
     if (!e) { vp.dataset.cursor = 'default'; return; }
     const p = toDoc(e);
@@ -389,28 +530,158 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
 
   /* ---------------- pointer ---------------- */
   let drag = null, marquee = null, space = false, nodeEdit = null, dragNode = -1;
+  let lastTap = { id: null, t: 0, x: 0, y: 0 };
+
+  /* what a double-click opens, by what you double-clicked */
+  let lastEditPoint = null;
+  function editItem(it, p) {
+    lastEditPoint = p ? docToGen(it, p) : null;
+    sel.clear(); sel.add(it.id);
+    if (it.type === 'text') return startEdit(it);
+    if (it.type === 'shape' || it.type === 'path') return startNodeEdit(it, lastEditPoint);
+    openSVGEditor(it);
+  }
+
+  /* ==========================================================
+     PATH DATA — parse, drag an anchor, serialise back
+     Our generators only ever emit M / L / C / Z.
+     ========================================================== */
+  function parseD(d) {
+    const cmds = [], re = /([MLCZ])([^MLCZ]*)/gi;
+    let m;
+    while ((m = re.exec(d))) {
+      cmds.push({
+        op: m[1].toUpperCase(),
+        nums: (m[2].match(/-?\d*\.?\d+(?:e[-+]?\d+)?/gi) || []).map(Number)
+      });
+    }
+    return cmds;
+  }
+  const n2 = v => Math.round(v * 100) / 100;
+  const serialiseD = cmds => cmds.map(c => c.op + c.nums.map(n2).join(' ')).join('');
+
+  /* the on-curve points — the ones worth showing as handles */
+  function anchorsOf(cmds) {
+    const out = [];
+    cmds.forEach((c, ci) => {
+      if (c.op === 'M' || c.op === 'L') { for (let k = 0; k + 1 < c.nums.length; k += 2) out.push({ ci, ni: k }); }
+      else if (c.op === 'C') { for (let k = 0; k + 5 < c.nums.length; k += 6) out.push({ ci, ni: k + 4 }); }
+    });
+    return out;
+  }
+
+  /* move an anchor and carry its neighbouring control points with it, so the
+     curve keeps its shape instead of kinking */
+  function moveAnchor(cmds, ci, ni, dx, dy) {
+    const c = cmds[ci];
+    c.nums[ni] += dx; c.nums[ni + 1] += dy;
+    if (c.op === 'C' && ni >= 2) { c.nums[ni - 2] += dx; c.nums[ni - 1] += dy; }
+    const nxt = cmds[ci + 1];
+    if (nxt && nxt.op === 'C' && nxt.nums.length >= 2) { nxt.nums[0] += dx; nxt.nums[1] += dy; }
+  }
+
+  /* Freeze a generated shape into plain editable paths. Appearance is
+     identical; the shape dials go away, which is the honest trade. */
+  function freezeToPath(it) {
+    if (it.type === 'path') return;
+    it.strokes = strokesFor(it).map(s => ({ d: s.d, role: s.role, fill: s.fill, w: s.w, cap: s.cap, op: s.op, clip: s.clip }));
+    it.type = 'path';
+    delete it.gen; delete it.params;
+    it._cmds = null;
+  }
+
+  /* Handles for ONE path at a time. A sketchy drawing is a dozen overlapping
+     strokes; showing every anchor at once is unusable. */
+  let activeStroke = 0;
+  function nodeHandles(it) {
+    if (it.gen === 'custom') return (it.params._pts || []).map((p, i) => ({ kind: 'pt', i, x: p[0], y: p[1] }));
+    if (it.type === 'path') {
+      if (!it._cmds) it._cmds = it.strokes.map(s => parseD(s.d));
+      const si = Math.max(0, Math.min(it._cmds.length - 1, activeStroke));
+      const cmds = it._cmds[si];
+      if (!cmds) return [];
+      return anchorsOf(cmds).map(an => ({ kind: 'anchor', si, ci: an.ci, ni: an.ni, x: cmds[an.ci].nums[an.ni], y: cmds[an.ci].nums[an.ni + 1] }));
+    }
+    return [];
+  }
+
+  /* which stroke of a frozen path sits closest to a point (0..100 space) */
+  function nearestStroke(it, g) {
+    if (!it._cmds) it._cmds = it.strokes.map(s => parseD(s.d));
+    let best = 0, bestD = Infinity;
+    it._cmds.forEach((cmds, si) => {
+      anchorsOf(cmds).forEach(an => {
+        const dx = cmds[an.ci].nums[an.ni] - g.x, dy = cmds[an.ci].nums[an.ni + 1] - g.y;
+        const d = dx * dx + dy * dy;
+        if (d < bestD) { bestD = d; best = si; }
+      });
+    });
+    return best;
+  }
+
+  function moveHandle(it, h, gx, gy) {
+    if (h.kind === 'pt') {
+      const pts = it.params._pts.slice();
+      pts[h.i] = [gx, gy];
+      it.params = Object.assign({}, it.params, { _pts: pts });
+    } else {
+      moveAnchor(it._cmds[h.si], h.ci, h.ni, gx - h.x, gy - h.y);
+      it.strokes[h.si].d = serialiseD(it._cmds[h.si]);
+    }
+    h.x = gx; h.y = gy;
+  }
+
+  function simplifyPts(pts, tol) {
+    if (pts.length < 3) return pts;
+    const seg = (p, a, b) => {
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1);
+      const u = Math.max(0, Math.min(1, t));
+      const cx = a.x + u * dx, cy = a.y + u * dy;
+      return (p.x - cx) ** 2 + (p.y - cy) ** 2;
+    };
+    const rec = (s, e) => {
+      let idx = -1, max = 0;
+      for (let i = s + 1; i < e; i++) { const d = seg(pts[i], pts[s], pts[e]); if (d > max) { max = d; idx = i; } }
+      if (max > tol * tol && idx > 0) return rec(s, idx).concat(rec(idx, e).slice(1));
+      return [pts[s], pts[e]];
+    };
+    return rec(0, pts.length - 1);
+  }
 
   /* ---- point editing on a drawn path ---- */
-  function startNodeEdit(it) {
-    if (!it || it.gen !== 'custom' || !it.params._pts) return false;
+  let nodeList = [];
+  function startNodeEdit(it, at) {
+    if (!it || (it.type !== 'shape' && it.type !== 'path')) return false;
+    const wasGenerated = it.type === 'shape' && it.gen !== 'custom';
+    if (wasGenerated) freezeToPath(it);
     stopEdit(); nodeEdit = it; sel.clear(); sel.add(it.id);
+    activeStroke = at ? nearestStroke(it, at) : 0;
+    nodeList = nodeHandles(it);
+    if (!nodeList.length) { nodeEdit = null; toast('nothing to edit on this layer'); return false; }
     $('#nodeHint').classList.add('on');
+    if (wasGenerated) commit();
+    const many = it.type === 'path' && it._cmds.length > 1;
+    toast(nodeList.length + ' points' + (many ? ' · click another stroke to switch' : '') );
     render(); refreshPanels(); return true;
   }
   function stopNodeEdit() {
     if (!nodeEdit) return;
-    nodeEdit = null; dragNode = -1;
+    nodeEdit._cmds = null;
+    nodeEdit = null; dragNode = -1; nodeList = [];
     $('#nodeHint').classList.remove('on');
-    commit(); render();
+    commit(); render(); refreshPanels();
   }
   function hitNode(p) {
     if (!nodeEdit) return -1;
-    const pts = nodeEdit.params._pts || [], tol = 9 / view.z;
-    for (let i = 0; i < pts.length; i++) {
-      const P = genToDoc(nodeEdit, pts[i][0], pts[i][1]);
-      if (Math.hypot(P.x - p.x, P.y - p.y) < tol) return i;
-    }
-    return -1;
+    const tol = 9 / view.z;
+    let best = -1, bestD = tol;
+    nodeList.forEach((h, i) => {
+      const P = genToDoc(nodeEdit, h.x, h.y);
+      const d = Math.hypot(P.x - p.x, P.y - p.y);
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    return best;
   }
 
   function onDown(e) {
@@ -422,18 +693,26 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     if (nodeEdit) {
       const ni = hitNode(p);
       if (ni >= 0) {
-        if (e.altKey && (nodeEdit.params._pts || []).length > 2) {
-          nodeEdit.params._pts.splice(ni, 1);
-          nodeEdit.params = Object.assign({}, nodeEdit.params);   // bust the stroke cache
+        if (e.altKey && nodeEdit.gen === 'custom' && (nodeEdit.params._pts || []).length > 2) {
+          const pts = nodeEdit.params._pts.slice(); pts.splice(nodeList[ni].i, 1);
+          nodeEdit.params = Object.assign({}, nodeEdit.params, { _pts: pts });
+          nodeList = nodeHandles(nodeEdit);
           commit(); render(); return;
         }
         dragNode = ni; drag = { mode: 'node' }; drawUI(); return;
       }
       if (hitItem(p) !== nodeEdit) { stopNodeEdit(); }
-      else return;
+      else {
+        if (nodeEdit.type === 'path' && nodeEdit._cmds.length > 1) {
+          const si = nearestStroke(nodeEdit, docToGen(nodeEdit, p));
+          if (si !== activeStroke) { activeStroke = si; nodeList = nodeHandles(nodeEdit); drawUI(); }
+        }
+        return;
+      }
     }
 
     if (tool === 'pen') { penClick(p); return; }
+    if (tool === 'pencil') { pen = { pts: [p], free: 1 }; drag = { mode: 'draw' }; drawUI(); return; }
     if (tool === 'text') {
       const it = makeText('Text', { x: p.x, y: p.y, w: doc.w * .5, h: doc.h * .09 });
       addItem(it); setTool('select'); setTimeout(() => startEdit(it), 40); return;
@@ -444,12 +723,30 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     if (hh) { drag = { mode: hh.mode, it: hh.it, hx: hh.hx, hy: hh.hy, start: p, snap: snapshot() }; return; }
     const it = hitItem(p);
     if (!it) {
+      const bi = boardAt(p);
+      if (bi >= 0 && bi !== doc.active) setActiveBoard(bi);
       if (!e.shiftKey) { sel.clear(); refreshPanels(); }
       marquee = { x0: p.x, y0: p.y, x1: p.x, y1: p.y }; drag = { mode: 'marquee' };
       drawUI(); return;
     }
-    if (e.shiftKey) sel.has(it.id) ? sel.delete(it.id) : sel.add(it.id);
-    else if (!sel.has(it.id)) { sel.clear(); sel.add(it.id); }
+    // Own the double-click rather than relying on the browser's dblclick,
+    // which the canvas redraw can break.
+    const now = Date.now();
+    if (lastTap.id === it.id && now - lastTap.t < 450 &&
+      Math.hypot(p.x - lastTap.x, p.y - lastTap.y) < 10 / view.z) {
+      lastTap = { id: null, t: 0, x: 0, y: 0 };
+      drag = null;
+      return editItem(it, p);
+    }
+    lastTap = { id: it.id, t: now, x: p.x, y: p.y };
+
+    const family = withGroup(it);
+    if (e.shiftKey) {
+      const on = sel.has(it.id);
+      family.forEach(f => on ? sel.delete(f.id) : sel.add(f.id));
+    } else if (!sel.has(it.id)) {
+      sel.clear(); family.forEach(f => sel.add(f.id));
+    }
     if (e.altKey) duplicateSel();
     drag = { mode: 'move', start: p, snap: snapshot(), targets: snapTargets(sel) };
     refreshPanels(); drawUI(); updateCursor();
@@ -460,11 +757,14 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     if (drag.mode === 'pan') { view.ox = drag.ox + (e.clientX - drag.sx); view.oy = drag.oy + (e.clientY - drag.sy); applyView(); return; }
     const p = toDoc(e);
 
+    if (drag.mode === 'draw') {
+      const last = pen.pts[pen.pts.length - 1];
+      if (Math.hypot(p.x - last.x, p.y - last.y) > 3 / view.z) { pen.pts.push({ x: p.x, y: p.y }); drawUI(); }
+      return;
+    }
     if (drag.mode === 'node') {
       const g = docToGen(nodeEdit, p);
-      const pts = nodeEdit.params._pts.slice();
-      pts[dragNode] = [g.x, g.y];
-      nodeEdit.params = Object.assign({}, nodeEdit.params, { _pts: pts });
+      moveHandle(nodeEdit, nodeList[dragNode], g.x, g.y);
       render(); return;
     }
 
@@ -529,10 +829,22 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   }
 
   function onUp() {
-    if (drag && drag.mode === 'node') { dragNode = -1; drag = null; commit(); render(); return; }
+    if (drag && drag.mode === 'draw') {
+      drag = null;
+      const raw = pen ? pen.pts : [];
+      pen = { pts: simplifyPts(raw, 2.2 / view.z) };
+      const first = pen.pts[0], last = pen.pts[pen.pts.length - 1];
+      const shut = penOpts.closed && first && last && Math.hypot(last.x - first.x, last.y - first.y) < 22 / view.z;
+      finishPen(shut ? 1 : 0);
+      return;
+    }
+    // Never rebuild the artwork here. onMove has already drawn the result, and
+    // replacing the SVG between press and release stops the browser ever
+    // pairing two clicks into a double-click.
+    if (drag && drag.mode === 'node') { dragNode = -1; drag = null; commit(); drawUI(); return; }
     if (drag && ['move', 'scale', 'rot'].includes(drag.mode)) commit();
     if (drag && drag.mode === 'marquee') { marquee = null; refreshPanels(); }
-    drag = null; guides = []; render(); updateCursor();
+    drag = null; guides = []; drawUI(); updateCursor();
   }
   function snapshot() { const o = {}; doc.items.forEach(i => o[i.id] = { x: i.x, y: i.y, w: i.w, h: i.h, rot: i.rot, size: i.size }); return o; }
 
@@ -553,7 +865,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     const w = Math.max(x1 - x0, 8), h = Math.max(y1 - y0, 8);
     const local = pen.pts.map(p => [((p.x - x0) / w) * 100, ((p.y - y0) / h) * 100]);
     const it = makeItem('custom', { x: x0, y: y0, w, h });
-    it.params = { closed: closed ? 1 : 0, smooth: 70, _pts: local };
+    it.params = { closed: closed ? 1 : 0, smooth: penOpts.smooth ? 70 : 0, _pts: local };
     it.name = 'Drawing';
     pen = null; setTool('select');
     addItem(it);
@@ -627,7 +939,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   }
   function restore(snap) {
     const s = JSON.parse(snap);
-    doc = s.d; sel = new Set((s.s || []).filter(id => doc.items.some(i => i.id === id)));
+    doc = migrateBoards(s.d); sel = new Set((s.s || []).filter(id => doc.items.some(i => i.id === id)));
     render(); refreshPanels(); saveCurrent();
     $('#docName').textContent = doc.name; updateHistoryButtons();
   }
@@ -640,16 +952,20 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
 
   function openDoc(d, resetHistory) {
     stopEdit(); if (doc) saveCurrent(true);
-    doc = d; sel.clear();
+    doc = migrateBoards(d); sel.clear();
     if (resetHistory !== false) { history = []; hi = -1; }
-    buildPalettes(); buildLibrary(); refreshPanels(); render(); fitView(); commit();
+    buildStylePicker(); buildPalettes(); buildLibrary(); refreshPanels(); render(); fitView(); commit();
     $('#docName').textContent = doc.name;
     closeHome();
   }
 
   /* ---------------- templates ---------------- */
   function docFromTemplate(tpl) {
+    if (tpl.style && tpl.style !== libStyle) applyStyle(tpl.style);
     const d = newDoc(tpl.w, tpl.h, tpl.pal, tpl.name === 'Blank canvas' ? 'Untitled' : tpl.name);
+    const pals = S.stylePalettes(tpl.style || libStyle);
+    const pr = pals[(tpl.pal || 0) % pals.length];
+    d.paper = pr[1]; d.colors = [pr[2], pr[3], pr[4], pr[5], pr[1]]; d.palIdx = tpl.pal || 0;
     d.texture = tpl.texture; d.textureAmt = tpl.amt; d.textureScale = 1;
     (tpl.items || []).forEach(sl => {
       const box = { x: sl.x / 100 * d.w, y: sl.y / 100 * d.h, w: sl.w / 100 * d.w, h: sl.h / 100 * d.h };
@@ -684,13 +1000,138 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     commit(); render(); refreshPanels();
   }
   function duplicateSel() {
-    const add = [];
-    doc.items.forEach(it => { if (sel.has(it.id)) { const c = JSON.parse(JSON.stringify(it)); c.id = uid(); c.x += 20; c.y += 20; add.push(c); } });
+    const add = [], remap = {};
+    doc.items.forEach(it => { if (sel.has(it.id)) { const c = JSON.parse(JSON.stringify(it)); c.id = uid(); c.x += 20; c.y += 20;
+      if (c.g) { remap[c.g] = remap[c.g] || 'g' + uid(); c.g = remap[c.g]; }
+      add.push(c); } });
     if (!add.length) return;
     doc.items.push(...add); sel.clear(); add.forEach(a => sel.add(a.id));
     commit(); render(); refreshPanels();
   }
   function deleteSel() { if (!sel.size) return; doc.items = doc.items.filter(i => !sel.has(i.id)); sel.clear(); commit(); render(); refreshPanels(); }
+
+  /* ---------------- groups ----------------
+     A group is a shared id on the members, not a container. Clicking any member
+     selects the whole group; everything else (move, align, delete) already
+     works on a multi-selection. */
+  function groupSel() {
+    const items = doc.items.filter(i => sel.has(i.id));
+    if (items.length < 2) { toast('Select two or more to group'); return; }
+    const gid = 'g' + uid();
+    items.forEach(i => i.g = gid);
+    // keep members contiguous in z-order so the group reads as one thing
+    const rest = doc.items.filter(i => !sel.has(i.id));
+    const at = Math.max(...items.map(i => doc.items.indexOf(i)));
+    const before = rest.filter(i => doc.items.indexOf(i) < at);
+    doc.items = before.concat(items, rest.filter(i => doc.items.indexOf(i) > at));
+    commit(); render(); refreshPanels();
+    toast('Grouped ' + items.length + ' layers');
+  }
+  function ungroupSel() {
+    const items = doc.items.filter(i => sel.has(i.id) && i.g);
+    if (!items.length) { toast('Nothing grouped here'); return; }
+    const gone = new Set(items.map(i => i.g));
+    doc.items.forEach(i => { if (gone.has(i.g)) delete i.g; });
+    commit(); render(); refreshPanels();
+    toast('Ungrouped');
+  }
+  /* ---------------- repeat ----------------
+     Makes real copies, so every one stays editable afterwards. */
+  function repeatSel(opts) {
+    const src = doc.items.filter(i => sel.has(i.id));
+    if (!src.length) { toast('Select something to repeat'); return; }
+    const b = selBounds(src);
+    const cx = (b.x + b.r) / 2, cy = (b.y + b.b) / 2;
+    const w = b.r - b.x, h = b.b - b.y;
+    const made = [];
+    const gid = src.length > 1 || opts.group ? 'g' + uid() : null;
+
+    const clone = (dx, dy, rot) => {
+      src.forEach(it => {
+        const c = JSON.parse(JSON.stringify(it));
+        c.id = uid();
+        if (rot) {
+          // orbit the copy around the centre and turn it to face outward
+          const a = rot * Math.PI / 180;
+          const ox = (it.x + it.w / 2) - cx, oy = (it.y + it.h / 2) - cy;
+          c.x = cx + ox * Math.cos(a) - oy * Math.sin(a) - it.w / 2 + dx;
+          c.y = cy + ox * Math.sin(a) + oy * Math.cos(a) - it.h / 2 + dy;
+          c.rot = (it.rot || 0) + (opts.turn ? rot : 0);
+        } else { c.x = it.x + dx; c.y = it.y + dy; }
+        if (gid) c.g = gid;
+        made.push(c);
+      });
+    };
+
+    if (opts.mode === 'radial') {
+      const n = Math.max(2, opts.count);
+      for (let i = 1; i < n; i++) {
+        const step = 360 / n * i;
+        const a = step * Math.PI / 180;
+        clone(Math.cos(a - Math.PI / 2) * opts.radius, Math.sin(a - Math.PI / 2) * opts.radius, step);
+      }
+      if (opts.radius) src.forEach(it => { it.y -= opts.radius; });
+    } else if (opts.mode === 'grid') {
+      for (let r = 0; r < opts.rows; r++) for (let c = 0; c < opts.cols; c++) {
+        if (!r && !c) continue;
+        clone(c * (w + opts.gap), r * (h + opts.gap), 0);
+      }
+    } else {
+      const a = (opts.angle || 0) * Math.PI / 180;
+      for (let i = 1; i < Math.max(2, opts.count); i++) {
+        clone(Math.cos(a) * (w + opts.gap) * i, Math.sin(a) * (h + opts.gap) * i, 0);
+      }
+    }
+
+    if (gid) src.forEach(it => it.g = gid);
+    doc.items.push(...made);
+    sel.clear(); src.concat(made).forEach(i => sel.add(i.id));
+    commit(); render(); refreshPanels();
+    toast(made.length + ' copies');
+  }
+
+  function openRepeat() {
+    if (!sel.size) { toast('Select something to repeat'); return; }
+    const o = { mode: 'radial', count: 8, radius: Math.round(Math.min(doc.w, doc.h) * .18), turn: 1, cols: 3, rows: 3, gap: 30, angle: 0, group: 1 };
+    modal('Repeat', body => {
+      body.appendChild(el('p', 'hint', 'Real copies, so you can still edit each one afterwards.'));
+      const modeSel = el('div', 'chips');
+      const rows = el('div');
+      const build = () => {
+        rows.innerHTML = '';
+        if (o.mode === 'radial') {
+          rows.appendChild(ctrlNum('Copies', o.count, 2, 48, 1, v => o.count = v));
+          rows.appendChild(ctrlNum('Radius', o.radius, 0, Math.round(Math.min(doc.w, doc.h) * .5), 1, v => o.radius = v));
+          rows.appendChild(ctrlBool('Turn each copy', o.turn, v => o.turn = v));
+        } else if (o.mode === 'grid') {
+          rows.appendChild(ctrlNum('Columns', o.cols, 1, 12, 1, v => o.cols = v));
+          rows.appendChild(ctrlNum('Rows', o.rows, 1, 12, 1, v => o.rows = v));
+          rows.appendChild(ctrlNum('Gap', o.gap, 0, 300, 1, v => o.gap = v));
+        } else {
+          rows.appendChild(ctrlNum('Copies', o.count, 2, 40, 1, v => o.count = v));
+          rows.appendChild(ctrlNum('Gap', o.gap, -200, 300, 1, v => o.gap = v));
+          rows.appendChild(ctrlNum('Angle', o.angle, -180, 180, 1, v => o.angle = v));
+        }
+        rows.appendChild(ctrlBool('Group the result', o.group, v => o.group = v));
+      };
+      [['radial', 'Radial'], ['grid', 'Grid'], ['line', 'Along a line']].forEach(([k, label]) => {
+        const b = el('button', 'chip' + (o.mode === k ? ' on' : ''), label);
+        b.onclick = () => { o.mode = k; [...modeSel.children].forEach(c => c.classList.toggle('on', c === b)); build(); };
+        modeSel.appendChild(b);
+      });
+      body.append(modeSel, rows);
+      build();
+      const go = el('button', 'wide solid', 'Repeat');
+      go.onclick = () => { repeatSel(o); closeModal(); };
+      body.appendChild(go);
+    });
+  }
+
+  /* expand a click on one member into the whole group */
+  function withGroup(it) {
+    if (!it || !it.g) return [it];
+    return doc.items.filter(i => i.g === it.g);
+  }
   function orderSel(dir) {
     const idx = doc.items.map((it, i) => sel.has(it.id) ? i : -1).filter(i => i >= 0);
     if (!idx.length) return;
@@ -700,13 +1141,51 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     if (dir === 'down') idx.forEach(i => { if (i > 0) { const t = doc.items[i]; doc.items[i] = doc.items[i - 1]; doc.items[i - 1] = t; } });
     commit(); render(); refreshPanels();
   }
+  /* One object aligns to the page. Two or more align to each other — which is
+     what you actually want most of the time. */
+  function selBounds(items) {
+    return {
+      x: Math.min(...items.map(i => i.x)), y: Math.min(...items.map(i => i.y)),
+      r: Math.max(...items.map(i => i.x + i.w)), b: Math.max(...items.map(i => i.y + i.h)),
+    };
+  }
   function alignSel(mode) {
-    const items = doc.items.filter(i => sel.has(i.id)); if (!items.length) return;
+    const items = doc.items.filter(i => sel.has(i.id) && !i.locked);
+    if (!items.length) return;
+    const box = items.length > 1
+      ? selBounds(items)
+      : (bd => ({ x: bd.x, y: bd.y, r: bd.x + bd.w, b: bd.y + bd.h }))(board());
     items.forEach(it => {
-      if (mode === 'l') it.x = 0; if (mode === 'r') it.x = doc.w - it.w; if (mode === 'cx') it.x = (doc.w - it.w) / 2;
-      if (mode === 't') it.y = 0; if (mode === 'b') it.y = doc.h - it.h; if (mode === 'cy') it.y = (doc.h - it.h) / 2;
+      if (mode === 'l') it.x = box.x;
+      if (mode === 'r') it.x = box.r - it.w;
+      if (mode === 'cx') it.x = (box.x + box.r - it.w) / 2;
+      if (mode === 't') it.y = box.y;
+      if (mode === 'b') it.y = box.b - it.h;
+      if (mode === 'cy') it.y = (box.y + box.b - it.h) / 2;
     });
     commit(); render();
+    toast(items.length > 1 ? 'Aligned to selection' : 'Aligned to page');
+  }
+
+  /* equal gaps between edges, the way a designer means it */
+  function distributeSel(axis) {
+    const items = doc.items.filter(i => sel.has(i.id) && !i.locked);
+    if (items.length < 3) { toast('Select three or more to distribute'); return; }
+    const horiz = axis === 'h';
+    const size = it => horiz ? it.w : it.h;
+    const pos = it => horiz ? it.x : it.y;
+    items.sort((a, b) => pos(a) - pos(b));
+    const first = items[0], last = items[items.length - 1];
+    const span = (pos(last) + size(last)) - pos(first);
+    const used = items.reduce((s, it) => s + size(it), 0);
+    const gap = (span - used) / (items.length - 1);
+    let cur = pos(first);
+    items.forEach(it => {
+      if (horiz) it.x = cur; else it.y = cur;
+      cur += size(it) + gap;
+    });
+    commit(); render();
+    toast('Distributed ' + (horiz ? 'horizontally' : 'vertically'));
   }
 
   /* ==========================================================
@@ -764,7 +1243,9 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     const one = items[0];
     const groups = [
       [{ label: 'Duplicate', icon: 'duplicate', key: 'Ctrl D', fn: duplicateSel },
-      { label: one.type === 'text' ? 'Edit text' : 'New hand', icon: one.type === 'text' ? 'type' : 'refresh', key: one.type === 'text' ? '' : 'R', fn: () => one.type === 'text' ? startEdit(one) : (items.forEach(i => i.seed = rint(0, 99999)), commit(), render()) }].concat(one.type === 'text' ? [] : [one.gen === 'custom' ? { label: 'Edit points', icon: 'pen', fn: () => startNodeEdit(one) } : { label: 'Edit SVG…', icon: 'code', fn: () => openSVGEditor(one) }]),
+      one.g ? { label: 'Ungroup', icon: 'group', key: 'Ctrl ⇧ G', fn: ungroupSel } : { label: 'Group', icon: 'group', key: 'Ctrl G', fn: groupSel },
+      { label: 'Repeat…', icon: 'grid', key: 'Ctrl R', fn: openRepeat },
+      { label: one.type === 'text' ? 'Edit text' : 'New hand', icon: one.type === 'text' ? 'type' : 'refresh', key: one.type === 'text' ? '' : 'R', fn: () => one.type === 'text' ? startEdit(one) : (items.forEach(i => i.seed = rint(0, 99999)), commit(), render()) }].concat(one.type === 'text' ? [] : [{ label: 'Edit points', icon: 'pen', fn: () => startNodeEdit(one) }, { label: 'Edit SVG code…', icon: 'code', fn: () => openSVGEditor(one) }]),
       [{ label: 'Stroke', swatches: 1, current: one.st.stroke, pick: v => { items.forEach(i => i.st.stroke = v); commit(); render(); refreshPanels(); } }],
     ];
     if (one.type === 'shape') {
@@ -786,7 +1267,33 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   /* ==========================================================
      LIBRARY
      ========================================================== */
-  let libCat = null, libQuery = '';
+  let libCat = null, libQuery = '', libStyle = 'warli';
+
+  /* Switching tradition swaps the whole discipline, not just the icons:
+     its palette, its ground, and how the brush behaves. */
+  function styleCats(k) {
+    return [...new Set(PRESETS.filter(p => p.style === k).map(p => p.cat))];
+  }
+  function applyStyle(k, opts) {
+    libStyle = k; libCat = null;
+    const st = S.styleOf(k);
+    if (opts && opts.paint) {
+      const pals = S.stylePalettes(k);
+      const p = pals[0];
+      doc.palIdx = st.palettes ? -1 : 0;
+      doc.paper = p[1];
+      doc.colors = [p[2], p[3], p[4], p[5], p[1]];
+      doc.texture = st.texture; doc.textureAmt = st.textureAmt;
+      commit(); render();
+    }
+    buildPalettes(); buildLibrary(); refreshPanels();
+  }
+  function buildStylePicker() {
+    const sel = $('#styleSel'); if (!sel) return;
+    sel.innerHTML = Object.values(S.STYLES).map(s =>
+      `<option value="${s.key}"${s.key === libStyle ? ' selected' : ''}>${s.name} — ${s.where}</option>`).join('');
+    sel.onchange = e => applyStyle(e.target.value, { paint: true });
+  }
   let thumbN = 0;
   function thumbFor(pre, colors, paper) {
     const h = new Hand(pre.seed, { rough: 1.05, bow: 1, passes: 2, fillMode: 'none' });
@@ -805,7 +1312,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   }
 
   function buildLibrary() {
-    const cats = S.PRESET_CATS;
+    const cats = styleCats(libStyle);
     if (!libCat || !cats.includes(libCat)) libCat = cats[0];
     const host = $('#lib'); host.innerHTML = '';
     const colors = [doc.colors[0], doc.colors[1]], paper = doc.paper;
@@ -820,8 +1327,10 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       host.appendChild(tabs);
     }
     const q = libQuery.trim().toLowerCase();
-    const list = q ? PRESETS.filter(p => p.search.includes(q)) : PRESETS.filter(p => p.cat === libCat);
+    const mine = PRESETS.filter(p => p.style === libStyle);
+    const list = q ? mine.filter(p => p.search.includes(q)) : mine.filter(p => p.cat === libCat);
     host.appendChild(el('div', 'libmeta', q ? `${list.length} match${list.length === 1 ? '' : 'es'}` : `${list.length} in ${libCat}`));
+    if (!q) { const st = S.styleOf(libStyle); if (st.note) host.appendChild(el('p', 'styleNote', st.note)); }
 
     const grid = el('div', 'libgrid');
     list.forEach(pre => {
@@ -936,18 +1445,42 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     const items = doc.items.filter(i => sel.has(i.id));
 
     if (!items.length) {
-      const g1 = group(host, 'Canvas', 'canvas', true);
+      const gB = group(host, 'Artboards', 'boards', true);
+      doc.boards.forEach((b, i) => {
+        const row = el('div', 'boardrow' + (i === doc.active ? ' on' : ''));
+        row.innerHTML = `<i>${icon('frame', 14)}</i><span>${esc(b.name)}</span><em>${b.w}×${b.h}</em>`;
+        row.querySelector('span').onclick = () => setActiveBoard(i);
+        row.querySelector('i').onclick = () => setActiveBoard(i);
+        row.querySelector('span').ondblclick = () => {
+          const nm = prompt('Name this board', b.name);
+          if (nm) { b.name = nm; commit(); refreshPanels(); }
+        };
+        const del = el('button', 'ico'); del.innerHTML = icon('trash', 13); del.title = 'Delete board';
+        del.onclick = e => { e.stopPropagation(); removeBoard(i); };
+        row.appendChild(del);
+        gB.appendChild(row);
+      });
+      const addRow = el('div', 'row');
+      const addSame = el('button', 'ghost', '+ Same size');
+      addSame.onclick = () => addBoard(null);
+      const addOther = el('select', '');
+      addOther.innerHTML = '<option value="-1">+ New size…</option>' + CANVASES.map((c, i) => `<option value="${i}">${c[0]}</option>`).join('');
+      addOther.onchange = e => { const i = +e.target.value; if (i >= 0) addBoard(CANVASES[i]); e.target.value = -1; };
+      addRow.append(addSame, addOther);
+      gB.appendChild(addRow);
+
+      const g1 = group(host, 'Board size', 'canvas', true);
       const sizeSel = el('select', 'wide');
       sizeSel.innerHTML = CANVASES.map((c, i) => `<option value="${i}">${c[0]} · ${c[1]}×${c[2]}</option>`).join('') + '<option value="-1">Custom</option>';
       sizeSel.value = CANVASES.findIndex(c => c[1] === doc.w && c[2] === doc.h);
-      sizeSel.onchange = e => { const i = +e.target.value; if (i >= 0) { doc.w = CANVASES[i][1]; doc.h = CANVASES[i][2]; commit(); render(); fitView(); refreshPanels(); } };
+      sizeSel.onchange = e => { const i = +e.target.value; if (i >= 0) { doc.w = CANVASES[i][1]; doc.h = CANVASES[i][2]; syncActiveBoard(); commit(); render(); fitView(); refreshPanels(); } };
       g1.appendChild(sizeSel);
       const wh = el('div', 'row');
       wh.innerHTML = `<div class="field"><label>W</label><input id="cw" type="number" value="${doc.w}"></div><div class="field"><label>H</label><input id="ch" type="number" value="${doc.h}"></div>`;
-      wh.querySelectorAll('input').forEach(inp => inp.onchange = () => { doc.w = clamp(+$('#cw').value, 80, 8000); doc.h = clamp(+$('#ch').value, 80, 8000); commit(); render(); fitView(); });
+      wh.querySelectorAll('input').forEach(inp => inp.onchange = () => { doc.w = clamp(+$('#cw').value, 80, 8000); doc.h = clamp(+$('#ch').value, 80, 8000); syncActiveBoard(); commit(); render(); fitView(); });
       g1.appendChild(wh);
       const swap = el('button', 'wide ghost', 'Swap width & height');
-      swap.onclick = () => { const t = doc.w; doc.w = doc.h; doc.h = t; commit(); render(); fitView(); refreshPanels(); };
+      swap.onclick = () => { const t = doc.w; doc.w = doc.h; doc.h = t; syncActiveBoard(); commit(); render(); fitView(); refreshPanels(); };
       g1.appendChild(swap);
 
       const g2 = group(host, 'Paper', 'paper', true);
@@ -981,6 +1514,15 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     });
     gT.appendChild(tf);
     gT.appendChild(ctrlNum('Rotation', it.rot, -180, 180, 1, v => { items.forEach(i => i.rot = v); render(); }));
+    /* what you most often do to the selected thing, one click away */
+    const qa = el('div', 'btnrow');
+    const q = (label, title, fn) => { const b = el('button', 'ghost', label); b.title = title; b.onclick = () => { fn(); commit(); render(); refreshPanels(); }; qa.appendChild(b); };
+    q('Flip ↔', 'Mirror horizontally', () => items.forEach(i => { i.flipX = !i.flipX; }));
+    q('Flip ↕', 'Mirror vertically', () => items.forEach(i => { i.flipY = !i.flipY; }));
+    const b0 = board() || { x: 0, y: 0, w: doc.w, h: doc.h };
+    q('↔ Board', 'Stretch across the board', () => items.forEach(i => { i.x = b0.x + b0.w * .03; i.w = b0.w * .94; }));
+    q('↕ Board', 'Stretch down the board', () => items.forEach(i => { i.y = b0.y + b0.h * .03; i.h = b0.h * .94; }));
+    gT.appendChild(qa);
     const ord = el('div', 'btnrow');
     [['front', 'Bring to front'], ['up', 'Forward'], ['down', 'Backward'], ['back', 'Send to back']].forEach(([d, t]) => {
       const b = el('button', 'ghost'); b.title = t; b.dataset.icon = d + ':15'; b.onclick = () => orderSel(d); ord.appendChild(b);
@@ -1001,6 +1543,15 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       g.appendChild(fs);
       const maxSize = Math.max(400, Math.round(Math.min(doc.w, doc.h) * .8));
       g.appendChild(ctrlNum('Size', Math.round(it.size), 6, maxSize, 1, v => { items.forEach(i => { if (i.type === 'text') i.size = v; }); render(); }));
+      g.appendChild(ctrlBool('Curve onto an arc', it.arc ? 1 : 0, v => {
+        it.arc = v;
+        if (v) { it.fit = 0; const s = Math.max(it.w, it.h, it.size * 4); it.w = s; it.h = s; it._tx = 0; it._ty = 0; }
+        render(); refreshPanels();
+      }));
+      if (it.arc) {
+        g.appendChild(ctrlNum('Arc sweep', it.arcSweep || 180, 20, 350, 5, v => { it.arcSweep = v; render(); }));
+        g.appendChild(ctrlBool('Read along the bottom', it.arcFlip ? 1 : 0, v => { it.arcFlip = v; render(); }));
+      }
       g.appendChild(ctrlSel('Align', ['Left', 'Centre', 'Right'], ['start', 'middle', 'end'].indexOf(it.align), v => { it.align = ['start', 'middle', 'end'][v]; render(); }));
       g.appendChild(ctrlNum('Letter spacing %', it.letter, -12, 45, .5, v => { it.letter = v; render(); }));
       g.appendChild(ctrlNum('Line height', it.lineH, .7, 2.2, .05, v => { it.lineH = v; render(); }));
@@ -1023,7 +1574,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     if (it.type !== 'svg') {
       const g = group(host, 'Colour', 'colour', true);
       g.appendChild(colorRow(it.type === 'text' ? 'Text' : 'Stroke', it.st.stroke, v => { items.forEach(i => i.st.stroke = v); render(); }));
-      if (it.type === 'shape') {
+      if (it.type === 'shape' || it.type === 'path') {
         g.appendChild(colorRow('Fill', it.st.fill, v => { items.forEach(i => i.st.fill = v); render(); }));
         g.appendChild(colorRow('Accent', it.st.accent, v => { items.forEach(i => i.st.accent = v); render(); }));
       }
@@ -1054,12 +1605,12 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       row.draggable = true;
       row.dataset.id = it.id;
       const label = it.type === 'text' ? String(it.text).split('\n')[0].slice(0, 20) || 'Text' : it.name;
-      const kind = it.type === 'text' ? 'type' : it.type === 'svg' ? 'image' : 'shapes';
+      const kind = it.type === 'text' ? 'type' : it.type === 'svg' ? 'image' : it.type === 'path' ? 'pen' : 'shapes';
       row.innerHTML = `<i class="lgrip" title="Drag to reorder">${icon('more', 13)}</i>
         <i class="lkind">${icon(kind, 14)}</i><span>${esc(label)}</span>
         <button class="lbtn eye" title="Show / hide">${icon(it.hidden ? 'eyeOff' : 'eye', 14)}</button>
         <button class="lbtn lock${it.locked ? ' on' : ''}" title="Lock">${icon(it.locked ? 'lock' : 'unlock', 14)}</button>`;
-      row.querySelector('span').onclick = e => { if (!e.shiftKey) sel.clear(); sel.add(it.id); render(); refreshPanels(); };
+      row.querySelector('span').onclick = e => { if (!e.shiftKey) sel.clear(); withGroup(it).forEach(f => sel.add(f.id)); render(); refreshPanels(); };
       row.querySelector('span').ondblclick = () => { if (it.type === 'text') startEdit(it); };
       row.querySelector('.eye').onclick = e => { e.stopPropagation(); it.hidden = it.hidden ? 0 : 1; commit(); render(); refreshPanels(); };
       row.querySelector('.lock').onclick = e => { e.stopPropagation(); it.locked = it.locked ? 0 : 1; commit(); refreshPanels(); };
@@ -1086,19 +1637,124 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   /* ---------------- palettes ---------------- */
   function buildPalettes() {
     const host = $('#pals'); host.innerHTML = '';
-    PALETTES.forEach((p, i) => {
+    S.stylePalettes(libStyle).forEach((p, i) => {
       const s = el('button', 'pal' + (doc.palIdx === i ? ' on' : ''));
       s.title = p[0]; s.style.background = p[1];
       s.innerHTML = `<i style="background:${p[2]}"></i><i style="background:${p[3]}"></i><i style="background:${p[4]}"></i>`;
       s.onclick = () => applyPalette(i);
       host.appendChild(s);
     });
+    buildBrandBar();
   }
   function applyPalette(i) {
-    const p = paletteAt(i);
+    const pal = S.stylePalettes(libStyle)[i];
+    const p = { name: pal[0], paper: pal[1], colors: [pal[2], pal[3], pal[4], pal[5], pal[1]] };
     doc.palIdx = i; doc.paper = p.paper; doc.colors = p.colors.slice();
     commit(); render(); buildPalettes(); buildLibrary(); refreshPanels();
   }
+  /* Items reference palette *slots*, so changing palette recolours everything —
+     unless someone picked a literal colour. This puts them all back on slots,
+     and can reshuffle which slot each one uses. */
+  function recolourAll(shuffle) {
+    let fixed = 0;
+    doc.items.forEach(it => {
+      const st = it.st;
+      if (typeof st.stroke === 'string' || typeof st.fill === 'string' || typeof st.accent === 'string') fixed++;
+      if (shuffle) {
+        st.stroke = Math.random() > .78 ? 1 : 0;
+        st.accent = Math.random() > .3 ? 1 : 2;
+        st.fill = Math.random() > .68 ? 1 : 4;
+      } else {
+        if (typeof st.stroke === 'string') st.stroke = 0;
+        if (typeof st.accent === 'string') st.accent = 1;
+        if (typeof st.fill === 'string') st.fill = 4;
+      }
+    });
+    commit(); render(); refreshPanels();
+    toast(shuffle ? 'Colours reshuffled' : (fixed ? fixed + ' layers put back on the palette' : 'Everything already follows the palette'));
+  }
+
+  /* ---------------- clipboard ---------------- */
+  async function copyAsSVG() {
+    stopEdit();
+    const items = doc.items.filter(i => sel.has(i.id));
+    const svg = await exportSVG(items.length ? items : null);
+    try {
+      if (navigator.clipboard && window.ClipboardItem) {
+        await navigator.clipboard.write([new ClipboardItem({
+          'image/svg+xml': new Blob([svg], { type: 'image/svg+xml' }),
+          'text/plain': new Blob([svg], { type: 'text/plain' }),
+        })]);
+      } else {
+        await navigator.clipboard.writeText(svg);
+      }
+      toast(items.length ? `Copied ${items.length} layer${items.length > 1 ? 's' : ''} as SVG` : 'Copied canvas as SVG');
+    } catch (e) {
+      try { await navigator.clipboard.writeText(svg); toast('Copied as SVG text'); }
+      catch (e2) { toast('clipboard blocked by the browser'); }
+    }
+  }
+
+  /* ---------------- brand kit ----------------
+     A locked palette + two typefaces that new documents and Surprise inherit,
+     so a studio's work stays on-brand without re-picking every time. */
+  const BKEY = 'scrawl.brand';
+  function brand() { try { return JSON.parse(localStorage.getItem(BKEY) || 'null'); } catch (e) { return null; } }
+  function setBrand(b) { try { b ? localStorage.setItem(BKEY, JSON.stringify(b)) : localStorage.removeItem(BKEY); } catch (e) { } buildPalettes(); }
+
+  function saveBrand() {
+    const heads = doc.items.filter(i => i.type === 'text');
+    const b = {
+      paper: doc.paper, colors: doc.colors.slice(),
+      head: heads[0] ? heads[0].font : 'Archivo Black',
+      body: heads[1] ? heads[1].font : 'DM Sans',
+      locked: 1,
+    };
+    setBrand(b);
+    toast('Brand kit saved — new files will use it');
+  }
+  function applyBrand() {
+    const b = brand(); if (!b) return;
+    doc.palIdx = -1; doc.paper = b.paper; doc.colors = b.colors.slice();
+    doc.items.filter(i => i.type === 'text').forEach((t, i) => { t.font = i === 0 ? b.head : b.body; });
+    commit(); render(); buildPalettes(); buildLibrary(); refreshPanels();
+    toast('Brand applied');
+  }
+  function toggleBrandLock() {
+    const b = brand(); if (!b) { toast('Save a brand kit first'); return; }
+    b.locked = b.locked ? 0 : 1; setBrand(b);
+    toast(b.locked ? 'Brand locked — Surprise will keep these colours' : 'Brand unlocked');
+  }
+
+  function buildBrandBar() {
+    const host = $('#brandbar'); if (!host) return;
+    const b = brand();
+    host.innerHTML = '';
+    if (!b) {
+      const save = el('button', 'wide ghost', 'Save this as my brand kit');
+      save.onclick = saveBrand; host.appendChild(save);
+      return;
+    }
+    const row = el('div', 'brandrow');
+    const sw = el('div', 'brandsw');
+    sw.style.background = b.paper;
+    b.colors.slice(0, 3).forEach(c => { const i = el('i'); i.style.background = c; sw.appendChild(i); });
+    row.appendChild(sw);
+    const meta = el('div', 'brandmeta', `<b>Brand kit</b><span>${esc(b.head)} · ${esc(b.body)}</span>`);
+    row.appendChild(meta);
+    const lock = el('button', 'ico' + (b.locked ? ' on' : ''));
+    lock.innerHTML = icon(b.locked ? 'lock' : 'unlock', 15);
+    lock.title = b.locked ? 'Locked — Surprise keeps these colours' : 'Unlocked';
+    lock.onclick = toggleBrandLock;
+    row.appendChild(lock);
+    host.appendChild(row);
+    const btns = el('div', 'row');
+    const use = el('button', 'ghost', 'Apply'); use.onclick = applyBrand;
+    const re = el('button', 'ghost', 'Update'); re.onclick = saveBrand;
+    const rm = el('button', 'ghost danger', 'Remove'); rm.onclick = () => { setBrand(null); buildBrandBar(); toast('Brand kit removed'); };
+    btns.append(use, re, rm); host.appendChild(btns);
+  }
+
   function randomPalette() {
     const h = Math.random() * 360, warm = Math.random() > .5;
     const paper = `hsl(${(h + rnd(-14, 14) + 360) % 360} ${rnd(12, 34)}% ${rnd(88, 96)}%)`;
@@ -1116,30 +1772,50 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
      ========================================================== */
   function surprise(opts = {}) {
     const cv = opts.keepCanvas ? [null, doc.w, doc.h] : pickOf(CANVASES);
-    const palIdx = rint(0, PALETTES.length - 1), p = paletteAt(palIdx);
-    doc.w = cv[1]; doc.h = cv[2];
-    doc.palIdx = palIdx; doc.paper = p.paper; doc.colors = p.colors.slice();
-    doc.texture = pickOf(TEXTURES); doc.textureAmt = +rnd(.04, .2).toFixed(2); doc.textureScale = +rnd(.6, 2).toFixed(1);
-    doc.items = [];
+    const bk = brand();
+    const onBrand = bk && bk.locked;
+    const pals = S.stylePalettes(libStyle);
+    const palIdx = rint(0, pals.length - 1);
+    const pr = pals[palIdx];
+    const p = { name: pr[0], paper: pr[1], colors: [pr[2], pr[3], pr[4], pr[5], pr[1]] };
+    doc.w = cv[1]; doc.h = cv[2]; syncActiveBoard();
+    if (onBrand) { doc.palIdx = -1; doc.paper = bk.paper; doc.colors = bk.colors.slice(); }
+    else { doc.palIdx = palIdx; doc.paper = p.paper; doc.colors = p.colors.slice(); }
+    const stx = S.styleOf(libStyle);
+    doc.texture = stx.texture || pickOf(TEXTURES);
+    doc.textureAmt = stx.textureAmt || +rnd(.04, .2).toFixed(2);
+    doc.textureScale = +rnd(.8, 1.6).toFixed(1);
+    // clear only what sits on this board
+    { const bd = board();
+      doc.items = doc.items.filter(i => !(i.x + i.w / 2 >= bd.x && i.x + i.w / 2 <= bd.x + bd.w && i.y + i.h / 2 >= bd.y && i.y + i.h / 2 <= bd.y + bd.h)); }
 
     const comp = pickOf(COMPOSITIONS), slots = comp.place(Math.random), bw = baseWeight();
-    const hand = { rough: +rnd(.5, 2.1).toFixed(2), bow: +rnd(.3, 1.7).toFixed(2), passes: rint(1, 3), weight: +(bw * rnd(.6, 1.9)).toFixed(2), wobble: Math.random() > .6 ? +rnd(1, 6).toFixed(1) : 0 };
-    const fillMode = pickOf(FILLS), font = pickOf(FONTS)[0];
-    const cats = S.PRESET_CATS.filter(c => c !== 'Patterns' && c !== 'Frames' && c !== 'Custom');
+    const sh = S.styleOf(libStyle).hand;
+    const hand = {
+      rough: +(sh.rough * rnd(.7, 1.4)).toFixed(2), bow: +(sh.bow * rnd(.7, 1.4)).toFixed(2),
+      passes: sh.passes, weight: +(bw * (sh.weight / 3.2) * rnd(.8, 1.3)).toFixed(2),
+      wobble: sh.rough < .5 ? 0 : (Math.random() > .6 ? +rnd(1, 6).toFixed(1) : 0),
+    };
+    const fillMode = pickOf(FILLS);
+    const font = onBrand ? bk.head : pickOf(FONTS)[0];
+    const bodyFont = onBrand ? bk.body : font;
+    const mine = PRESETS.filter(x => x.style === libStyle);
+    const cats = [...new Set(mine.map(x => x.cat))].filter(c => c !== 'Patterns' && c !== 'Frames' && c !== 'Borders' && c !== 'Custom');
     const theme = [pickOf(cats), pickOf(cats)];
-    const pool = PRESETS.filter(x => theme.includes(x.cat));
-    const heavy = PRESETS.filter(x => ['Characters', 'Objects', 'Nature', 'Shapes', 'Icons'].includes(x.cat));
-    const patPool = PRESETS.filter(x => x.cat === 'Patterns');
-    const framePool = PRESETS.filter(x => x.cat === 'Frames');
+    const pool = mine.filter(x => theme.includes(x.cat));
+    const heavy = mine.filter(x => ['Characters', 'Objects', 'Nature', 'Shapes', 'Icons', 'Figures', 'Animals', 'Village', 'Compositions'].includes(x.cat));
+    const patPool = mine.filter(x => x.cat === 'Patterns' || x.cat === 'Borders');
+    const framePool = mine.filter(x => x.cat === 'Frames' || x.cat === 'Borders');
     const strong = pool.filter(x => x.cat !== 'Marks');
     const anchor = pickOf(strong.length ? strong : heavy);
     const cohesion = Math.random();
 
     slots.forEach(sl => {
-      const box = { x: sl.x / 100 * doc.w, y: sl.y / 100 * doc.h, w: sl.w / 100 * doc.w, h: sl.h / 100 * doc.h };
+      const bd = board();
+      const box = { x: bd.x + sl.x / 100 * doc.w, y: bd.y + sl.y / 100 * doc.h, w: sl.w / 100 * doc.w, h: sl.h / 100 * doc.h };
       if (sl.text) {
         const t = makeText(sl.text === 'head' ? pickOf(WORDS) : pickOf(SUBS), box);
-        t.font = font;
+        t.font = sl.text === 'head' ? font : bodyFont;
         t.caps = sl.text === 'head' ? (Math.random() > .45 ? 1 : 0) : (Math.random() > .7 ? 1 : 0);
         t.st.stroke = sl.text === 'head' ? 0 : (Math.random() > .6 ? 1 : 0);
         t.st.weight = hand.weight; t.st.wobble = hand.wobble * .6;
@@ -1164,7 +1840,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       doc.items.push(it);
     });
     sel.clear(); commit(); render(); fitView(); buildPalettes(); buildLibrary(); refreshPanels();
-    toast(comp.name + ' · ' + p.name);
+    toast(comp.name + ' · ' + (onBrand ? 'your brand' : p.name));
   }
 
   /* ==========================================================
@@ -1208,12 +1884,15 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     const filterHost = $('#homeFilters'); filterHost.innerHTML = '';
     if (homeTab === 'templates') {
       $('#homeTitle').textContent = 'Start from a template';
-      (S.TEMPLATE_CATS || ['All']).forEach(c => {
+      const myCats = ['All', ...new Set(TEMPLATES.filter(t => (t.style || 'sketch') === libStyle).map(t => t.cat || 'Print'))];
+      if (!myCats.includes(tplCat)) tplCat = 'All';
+      myCats.forEach(c => {
         const b = el('button', 'chip' + (c === tplCat ? ' on' : ''), c);
         b.onclick = () => { tplCat = c; renderHome(); };
         filterHost.appendChild(b);
       });
       TEMPLATES
+        .filter(t => (t.style || 'sketch') === libStyle)
         .filter(t => tplCat === 'All' || (t.cat || 'Print') === tplCat)
         .filter(t => !q || t.name.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q))
         .forEach(tpl => {
@@ -1278,7 +1957,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   function itemSVGSource(it) {
     if (it.type === 'svg') return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${it.viewBox}">\n${it.markup}\n</svg>`;
     const sw = it.st.weight / ((Math.abs(it.w) + Math.abs(it.h)) / 200 || 1);
-    const body = strokesFor(it).map(st => {
+    const body = (it.type === 'path' ? it.strokes : strokesFor(it)).map(st => {
       const stroke = col(st.role === 'accent' ? it.st.accent : st.role === 'fill' ? it.st.fill : it.st.stroke);
       const fill = st.fill === 'none' ? 'none' : col(st.fill === 'accent' ? it.st.accent : st.fill === 'fill' ? it.st.fill : it.st.stroke);
       return `  <path d="${st.d}" fill="${fill}" stroke="${stroke}" stroke-width="${(st.w * sw).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/>`;
@@ -1345,14 +2024,28 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       fontCache[key] = css; return css;
     } catch (e) { fontCache[key] = ''; return ''; }
   }
-  async function exportSVG() {
-    const fams = [...new Set(doc.items.filter(i => i.type === 'text').map(i => i.font))];
-    let svg = buildSVG(doc, true);
+  /* Pass a subset to export just those layers, cropped to their bounds — that's
+     what "copy as SVG" needs so it pastes at a sane size elsewhere. */
+  async function exportSVG(subset) {
+    const list = subset && subset.length ? subset : doc.items;
+    const fams = [...new Set(list.filter(i => i.type === 'text').map(i => i.font))];
+    let svg;
+    if (subset && subset.length) {
+      const b = selBounds(list), pad = 2;
+      const view = { x: b.x - pad, y: b.y - pad, w: (b.r - b.x) + pad * 2, h: (b.b - b.y) + pad * 2 };
+      const sub = Object.assign({}, doc, { items: list, texture: 'none' });
+      const inner = buildSVG(sub, true);
+      const body = inner.slice(inner.indexOf('<defs>'), inner.lastIndexOf('</svg>'))
+        .replace(/<rect width="\d+" height="\d+" fill="[^"]*"\/>/, '');
+      svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(view.w)}" height="${Math.round(view.h)}" viewBox="${view.x.toFixed(1)} ${view.y.toFixed(1)} ${view.w.toFixed(1)} ${view.h.toFixed(1)}">${body}</svg>`;
+    } else {
+      svg = buildSVG(doc, true, board());
+    }
     if (fams.length) { const css = await inlineFonts(fams); if (css) svg = svg.replace('<defs>', `<defs><style>${css}</style>`); }
     return svg;
   }
   function saveBlob(b, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }
-  const slug = () => (doc.name || 'scrawl').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'scrawl';
+  const slug = () => (doc.name || 'motifs').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'motifs';
 
   async function doExport(kind) {
     stopEdit(); toast('preparing…');
@@ -1362,12 +2055,146 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     const scale = kind === 'png4' ? 4 : kind === 'png2' ? 2 : 1;
     const img = new Image();
     img.onload = () => {
-      const c = document.createElement('canvas'); c.width = doc.w * scale; c.height = doc.h * scale;
-      const g = c.getContext('2d'); g.scale(scale, scale); g.drawImage(img, 0, 0, doc.w, doc.h);
+      const bd = board();
+      const c = document.createElement('canvas'); c.width = bd.w * scale; c.height = bd.h * scale;
+      const g = c.getContext('2d'); g.scale(scale, scale); g.drawImage(img, 0, 0, bd.w, bd.h);
       c.toBlob(b => { saveBlob(b, slug() + '.png'); toast('PNG saved'); });
     };
     img.onerror = () => toast('render failed — try SVG');
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+  }
+
+  /* ---------------- print ----------------
+     Bleed extends the artwork past the trim so the guillotine can't leave a
+     white sliver; the marks tell the printer where the trim is. */
+  function cropMarks(trim, len, off, w) {
+    const x0 = trim.x, y0 = trim.y, x1 = trim.x + trim.w, y1 = trim.y + trim.h;
+    const out = [];
+    const ln = (a, b, c, e) => out.push(`<line x1="${a}" y1="${b}" x2="${c}" y2="${e}" stroke="#000" stroke-width="${w}"/>`);
+    [y0, y1].forEach(y => { ln(x0 - off - len, y, x0 - off, y); ln(x1 + off, y, x1 + off + len, y); });
+    [x0, x1].forEach(x => { ln(x, y0 - off - len, x, y0 - off); ln(x, y1 + off, x, y1 + off + len); });
+    return out.join('');
+  }
+
+  async function buildPrintSVG(o) {
+    const b = board();
+    const bleedR = { x: b.x - o.bleed, y: b.y - o.bleed, w: b.w + o.bleed * 2, h: b.h + o.bleed * 2 };
+    const markLen = o.marks ? Math.max(12, Math.min(b.w, b.h) * .035) : 0;
+    const markOff = o.marks ? markLen * .5 : 0;
+    const pad = o.bleed + markLen + markOff + (o.marks ? 6 : 0);
+    const viewRect = { x: b.x - pad, y: b.y - pad, w: b.w + pad * 2, h: b.h + pad * 2 };
+    let svg = buildSVG(doc, true, bleedR, viewRect);
+    if (o.marks) {
+      const mw = Math.max(.4, Math.min(b.w, b.h) * .0012);
+      svg = svg.replace('</svg>', cropMarks(b, markLen, markOff, mw) + '</svg>');
+    }
+    const fams = [...new Set(doc.items.filter(i => i.type === 'text').map(i => i.font))];
+    if (fams.length) { const css = await inlineFonts(fams); if (css) svg = svg.replace('<defs>', `<defs><style>${css}</style>`); }
+    return { svg, viewRect };
+  }
+
+  /* A single-page PDF wrapping one JPEG. Hand-rolled, because pulling in a PDF
+     library for one image would be silly. */
+  function makePDF(jpegBytes, pxW, pxH, dpi) {
+    const ptW = +(pxW / dpi * 72).toFixed(2), ptH = +(pxH / dpi * 72).toFixed(2);
+    const enc = new TextEncoder();
+    const parts = [], offsets = [];
+    let len = 0;
+    const push = chunk => {
+      const bytes = typeof chunk === 'string' ? enc.encode(chunk) : chunk;
+      parts.push(bytes); len += bytes.length;
+    };
+    const obj = (n, body) => { offsets[n] = len; push(`${n} 0 obj\n${body}\nendobj\n`); };
+
+    push('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
+    obj(1, '<</Type/Catalog/Pages 2 0 R>>');
+    obj(2, '<</Type/Pages/Kids[3 0 R]/Count 1>>');
+    obj(3, `<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${ptW} ${ptH}]/Resources<</XObject<</Im0 4 0 R>>>>/Contents 5 0 R>>`);
+
+    offsets[4] = len;
+    push(`4 0 obj\n<</Type/XObject/Subtype/Image/Width ${pxW}/Height ${pxH}/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ${jpegBytes.length}>>\nstream\n`);
+    push(jpegBytes);
+    push('\nendstream\nendobj\n');
+
+    const content = `q\n${ptW} 0 0 ${ptH} 0 0 cm\n/Im0 Do\nQ\n`;
+    obj(5, `<</Length ${content.length}>>\nstream\n${content}endstream`);
+
+    const xref = len;
+    let table = `xref\n0 6\n0000000000 65535 f \n`;
+    for (let i = 1; i <= 5; i++) table += String(offsets[i]).padStart(10, '0') + ' 00000 n \n';
+    push(table);
+    push(`trailer\n<</Size 6/Root 1 0 R>>\nstartxref\n${xref}\n%%EOF\n`);
+
+    const out = new Uint8Array(len);
+    let at = 0;
+    parts.forEach(p => { out.set(p, at); at += p.length; });
+    return out;
+  }
+
+  async function exportPrint(o) {
+    toast('rendering for print…');
+    const { svg, viewRect } = await buildPrintSVG(o);
+    const scale = o.dpi / 72 * (72 / 96) * o.dpi / o.dpi;   // px per document unit
+    const k = o.dpi / 96;                                    // documents are authored at ~96dpi
+    const pxW = Math.round(viewRect.w * k), pxH = Math.round(viewRect.h * k);
+    const img = new Image();
+    const ok = await new Promise(r => {
+      img.onload = () => r(1); img.onerror = () => r(0);
+      img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+    });
+    if (!ok) { toast('render failed'); return; }
+    const c = document.createElement('canvas');
+    c.width = pxW; c.height = pxH;
+    const g = c.getContext('2d');
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, pxW, pxH);
+    g.drawImage(img, 0, 0, pxW, pxH);
+    void scale;
+
+    if (o.format === 'pdf') {
+      const dataUrl = c.toDataURL('image/jpeg', 0.94);
+      const bin = atob(dataUrl.split(',')[1]);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const pdf = makePDF(bytes, pxW, pxH, o.dpi);
+      saveBlob(new Blob([pdf], { type: 'application/pdf' }), slug() + '-print.pdf');
+      toast(`PDF saved · ${(pxW / o.dpi).toFixed(2)}×${(pxH / o.dpi).toFixed(2)} in @ ${o.dpi}dpi`);
+    } else if (o.format === 'svg') {
+      saveBlob(new Blob([svg], { type: 'image/svg+xml' }), slug() + '-print.svg');
+      toast('Print SVG saved');
+    } else {
+      c.toBlob(b2 => { saveBlob(b2, slug() + '-print.png'); toast(`PNG saved · ${pxW}×${pxH}`); });
+    }
+  }
+
+  function openPrint() {
+    const b = board();
+    const o = { bleed: Math.round(Math.min(b.w, b.h) * .02), marks: 1, dpi: 300, format: 'pdf' };
+    modal('Print setup', body => {
+      body.appendChild(el('p', 'hint', 'Bleed extends the artwork past the trim so a slight miscut still shows ink, not paper. Crop marks show the printer where to cut.'));
+      const fmt = el('div', 'chips');
+      [['pdf', 'PDF'], ['png', 'PNG'], ['svg', 'SVG']].forEach(([k, label]) => {
+        const btn = el('button', 'chip' + (o.format === k ? ' on' : ''), label);
+        btn.onclick = () => { o.format = k; [...fmt.children].forEach(c => c.classList.toggle('on', c === btn)); info(); };
+        fmt.appendChild(btn);
+      });
+      body.appendChild(fmt);
+      body.appendChild(ctrlNum('Bleed', o.bleed, 0, Math.round(Math.min(b.w, b.h) * .1), 1, v => { o.bleed = v; info(); }));
+      body.appendChild(ctrlBool('Crop marks', o.marks, v => { o.marks = v; info(); }));
+      body.appendChild(ctrlSel('Resolution', ['150 dpi — proof', '300 dpi — print', '600 dpi — fine'], 1, v => { o.dpi = [150, 300, 600][v]; info(); }));
+      const out = el('p', 'hint');
+      body.appendChild(out);
+      function info() {
+        const pad = o.bleed + (o.marks ? Math.max(12, Math.min(b.w, b.h) * .035) * 1.5 + 6 : 0);
+        const w = (b.w + pad * 2) / 96, h = (b.h + pad * 2) / 96;
+        out.textContent = o.format === 'svg'
+          ? `Vector, ${Math.round(b.w + pad * 2)}×${Math.round(b.h + pad * 2)} units. Trim ${b.w}×${b.h}.`
+          : `Sheet ${w.toFixed(2)}×${h.toFixed(2)} in at ${o.dpi} dpi — ${Math.round(w * o.dpi)}×${Math.round(h * o.dpi)} px. Trim ${b.w}×${b.h}.`;
+      }
+      info();
+      const go = el('button', 'wide solid', 'Export for print');
+      go.onclick = () => { closeModal(); exportPrint(o); };
+      body.appendChild(go);
+    });
   }
 
   function openExportMenu() {
@@ -1378,6 +2205,10 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       { label: 'PNG · actual size', icon: 'image', fn: () => doExport('png1') },
     ], [
       { label: 'SVG · vector, editable', icon: 'code', fn: () => doExport('svg') },
+    ], [
+      { label: 'Print — bleed & crop marks…', icon: 'frame', fn: openPrint },
+    ], [
+      { label: 'Copy as SVG', icon: 'copy', key: 'Ctrl ⇧ C', fn: copyAsSVG },
     ], [
       { label: 'Project file · .json', icon: 'file', fn: () => doExport('json') },
     ]]);
@@ -1409,6 +2240,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
      ========================================================== */
   function setTheme(t) {
     document.documentElement.dataset.theme = t;
+    syncChromeColours();
     localStorage.setItem('scrawl.theme', t);
     $('#themeBtn').innerHTML = icon(t === 'dark' ? 'sun' : 'moon', 16);
     $('#themeBtn').title = t === 'dark' ? 'Light mode' : 'Dark mode';
@@ -1417,11 +2249,15 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   function togglePanel(side) { document.body.classList.toggle('no-' + side); setTimeout(drawUI, 30); }
 
   function setTool(t) {
-    if (tool === 'pen' && t !== 'pen' && pen) { pen = null; drawUI(); }
+    // any tool change abandons a half-drawn path — picking up the pen again
+    // must start a fresh one, not continue yesterday's
+    if (pen) { pen = null; drawUI(); }
     tool = t;
     $$('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === t));
     updateCursor();
     $('#penHint').classList.toggle('on', t === 'pen');
+    $('#pencilHint').classList.toggle('on', t === 'pencil');
+    $('#toolOpts').classList.toggle('on', t === 'pen' || t === 'pencil');
   }
 
   /* ==========================================================
@@ -1429,18 +2265,20 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
      ========================================================== */
   function bind() {
     const vp = $('#viewport');
-    vp.addEventListener('pointerdown', e => { try { vp.setPointerCapture(e.pointerId); } catch (er) { } onDown(e); });
+    // The dock and the panel tabs live inside #viewport. Capturing the pointer
+    // here retargets the follow-up click to #viewport, so those buttons never
+    // fire — only take the event when it really started on the canvas.
+    vp.addEventListener('pointerdown', e => {
+      const t = e.target;
+      const onCanvas = t === vp || (t instanceof Element && t.closest('#wrap'));
+      if (!onCanvas) return;
+      try { vp.setPointerCapture(e.pointerId); } catch (er) { }
+      onDown(e);
+    });
     vp.addEventListener('pointermove', onMove);
     vp.addEventListener('pointerup', onUp);
     vp.addEventListener('contextmenu', onContext);
-    vp.addEventListener('dblclick', e => {
-      if (tool === 'pen') return finishPen(false);
-      const it = hitItem(toDoc(e));
-      if (!it) return;
-      if (it.type === 'text') return startEdit(it);
-      if (it.type === 'shape' && it.gen === 'custom') return startNodeEdit(it);
-      openSVGEditor(it);
-    });
+    vp.addEventListener('dblclick', e => { if (tool === 'pen') finishPen(false); });
     vp.addEventListener('wheel', e => {
       e.preventDefault();
       const r = vp.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
@@ -1465,8 +2303,11 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       if (meta && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
       if (meta && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); return; }
       if (meta && e.key.toLowerCase() === 'd') { e.preventDefault(); duplicateSel(); return; }
+      if (meta && e.key.toLowerCase() === 'g') { e.preventDefault(); e.shiftKey ? ungroupSel() : groupSel(); return; }
+      if (meta && e.key.toLowerCase() === 'r') { e.preventDefault(); openRepeat(); return; }
       if (meta && e.key.toLowerCase() === 'a') { e.preventDefault(); sel.clear(); doc.items.forEach(i => sel.add(i.id)); render(); refreshPanels(); return; }
       if (meta && e.key.toLowerCase() === 'e') { e.preventDefault(); openExportMenu(); return; }
+      if (meta && e.shiftKey && e.key.toLowerCase() === 'c') { e.preventDefault(); copyAsSVG(); return; }
       if (meta) return;
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSel(); }
       if (e.key === 'Enter' && pen) { e.preventDefault(); finishPen(false); }
@@ -1475,6 +2316,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       if (e.key === 'h' || e.key === 'H') setTool('hand');
       if (e.key === 't' || e.key === 'T') setTool('text');
       if (e.key === 'p' || e.key === 'P') setTool('pen');
+      if (e.key === 'b' || e.key === 'B') setTool('pencil');
       if (e.key === ']') orderSel('up'); if (e.key === '[') orderSel('down');
       if (e.key === 'r' || e.key === 'R') { doc.items.forEach(i => { if (sel.has(i.id)) i.seed = rint(0, 99999); }); commit(); render(); }
       if (e.key === '0') fitView();
@@ -1492,6 +2334,11 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
 
     $('#libSearch').oninput = e => { libQuery = e.target.value; buildLibrary(); };
     $$('[data-tool]').forEach(b => b.onclick = () => setTool(b.dataset.tool));
+    $$('#toolOpts [data-opt]').forEach(b => b.onclick = () => {
+      const k = b.dataset.opt;
+      penOpts[k] = penOpts[k] ? 0 : 1;
+      b.classList.toggle('on', !!penOpts[k]);
+    });
     $('#btnSurprise').onclick = () => surprise();
     $('#btnFit').onclick = fitView;
     $('#btnZoomIn').onclick = () => { view.z = clamp(view.z * 1.25, .03, 10); applyView(); drawUI(); $('#zoomLbl').textContent = Math.round(view.z * 100) + '%'; };
@@ -1505,9 +2352,13 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     $('#btnKeys').onclick = openShortcuts;
     $('#themeBtn').onclick = toggleTheme;
     $('#btnPalRand').onclick = randomPalette;
+    $('#btnRecolour').onclick = e => recolourAll(e.shiftKey);
     $('#toggleLeft').onclick = () => togglePanel('left');
     $('#toggleRight').onclick = () => togglePanel('right');
     $$('[data-align]').forEach(b => b.onclick = () => alignSel(b.dataset.align));
+    $$('[data-dist]').forEach(b => b.onclick = () => distributeSel(b.dataset.dist));
+    $('#btnGroup').onclick = groupSel;
+    $('#btnUngroup').onclick = ungroupSel;
     $('#btnExport').onclick = openExportMenu;
 
     $('#docName').onblur = () => { doc.name = $('#docName').textContent.trim() || 'Untitled'; saveCurrent(true); };
@@ -1537,10 +2388,11 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     setTheme(localStorage.getItem('scrawl.theme') || 'light');
     const s = store();
     const rec = s.cur && s.docs[s.cur];
-    doc = rec ? rec.doc : docFromTemplate(TEMPLATES[0]);
+    const firstWarli = TEMPLATES.findIndex(t => t.style === 'warli');
+    doc = migrateBoards(rec ? rec.doc : docFromTemplate(TEMPLATES[firstWarli >= 0 ? firstWarli : 0]));
     bind(); setTool('select'); paintIcons();
     $('#btnSnap').classList.toggle('on', snapOn);
-    buildPalettes(); buildLibrary(); refreshPanels(); render(); fitView(); commit();
+    buildStylePicker(); buildPalettes(); buildLibrary(); refreshPanels(); render(); fitView(); commit();
     $('#docName').textContent = doc.name;
     document.fonts.ready.then(() => render());
     if (!rec) openHome('templates');
@@ -1549,7 +2401,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   window.__scrawl = {
     get doc() { return doc; }, get sel() { return sel; }, get view() { return view; }, get tool() { return tool; },
     hitHandle, localOf, render, surprise, exportSVG, openHome, startEdit, buildSVG, docFromTemplate,
-    setTool, finishPen, penClick, snapTargets, startNodeEdit, stopNodeEdit, openSVGEditor, itemSVGSource, get nodeEdit(){return nodeEdit}, PRESETS,
+    setTool, finishPen, penClick, snapTargets, applyStyle, get libStyle(){return libStyle}, styleCats, startNodeEdit, stopNodeEdit, openSVGEditor, itemSVGSource, buildPrintSVG, makePDF, openPrint, exportPrint, repeatSel, groupSel, ungroupSel, distributeSel, alignSel, recolourAll, copyAsSVG, addBoard, setActiveBoard, boardsBounds, brand, saveBrand, get nodeEdit(){return nodeEdit}, get lastTap(){return lastTap}, get nodeList(){return nodeList}, editItem, freezeToPath, nodeHandles, PRESETS,
   };
   window.addEventListener('load', boot);
 })();

@@ -33,8 +33,9 @@ kilobytes.
 | `gens.js` | 54 parametric generators: marks, shapes, frames, nature, objects, characters, patterns. |
 | `gens2.js` | 25 more for layout work: icons, ornaments, dividers, containers, badges. |
 | `gens3.js` | 24 more: plants, insects, landscape, and everyday objects. |
-| `presets.js` / `presets2.js` | 467 named library entries — a generator locked to chosen params. |
-| `templates.js` | 13 designed starting documents. |
+| `gens4.js` | 15 more: food, tools, weather, transport, charts and UI marks. |
+| `presets*.js` | 524 named library entries — a generator locked to chosen params. |
+| `templates.js` / `templates2.js` | 28 designed starting documents, including 8 logo lockups. |
 | `data.js` | 40 palettes, 18 canvas sizes, 32 typefaces, textures, `Surprise` recipes. |
 | `app.js` | The editor. |
 | `index.html` | Shell and styling. |
@@ -46,7 +47,7 @@ kilobytes.
 **Files** is the home screen — your saved work and the template gallery, with
 live previews. Everything autosaves.
 
-**Library** (left) holds 467 pieces across nine categories. Search it. Click to
+**Library** (left) holds 524 pieces across nine categories. Search it. Click to
 place. Right-click any tile for 60 live variants of the same generator.
 
 **Properties** (right) is grouped and collapsible — position, content, colour,
@@ -54,11 +55,34 @@ and *The hand*, which is where roughness, bend, stroke count, fill style and
 marker bleed live. Your open/closed choices are remembered.
 
 **Draw your own** with the pen tool (`P`): click points, click the first point
-to close. It becomes a normal layer with the full hand treatment. Or paste SVG
-code straight in (right-click the canvas) and place any vector you already have.
+to close.
+
+**Double-click any shape to edit its points.** Handles appear on one stroke at
+a time — a sketchy drawing is a dozen overlapping paths, so showing every anchor
+at once is unusable. Click another part of the shape to switch stroke. A generated shape is frozen into
+plain editable paths the first time you do this — the look is identical, but the
+shape dials are baked in from then on. Undo puts them back. The raw SVG source
+is still available under right-click › Edit SVG code.
 
 **Text** — press `T` and click, or double-click any text on the canvas to edit
-it in place.
+it in place. A text box always hugs its own letters, so the selection matches
+what you see; drag a handle to scale the type, or set the size directly.
+
+**Artboards.** One file holds several boards at different sizes — design a logo
+once and see it on a card, a sign and a sticker. Add them from the Artboards
+panel; click a board's paper to make it active. Export crops to the active board.
+
+**Brand kit.** Save the current palette and typefaces as your brand, lock it,
+and every new file and every Surprise inherits it instead of picking at random.
+
+**Groups** `Ctrl G` · **Repeat** `Ctrl R` — radial, grid or along a line, as
+real copies you can still edit. **Align** works between selected objects when
+two or more are picked, and to the board when one is. **Distribute** needs three.
+
+**Text on a path** — switch any text to *Curve onto an arc* for badges and seals;
+sweep and top/bottom reading are adjustable.
+
+**Print** — Export › Print gives bleed, crop marks, and PDF/PNG/SVG at 150–600 dpi.
 
 **Snapping** is on by default: drag something near another object's edge or
 centre and it sticks, with red guides. Hold `Ctrl`/`⌘` while dragging to ignore it.
@@ -170,9 +194,10 @@ silently blowing the quota.
 
 ## Keyboard
 
-`V` select · `H` pan · `T` text · `P` pen · double-click to edit text
+`V` select · `H` pan · `T` text · `P` pen · `B` pencil · double-click to edit points
 `Space`+drag pan · scroll zoom · `0` fit · right-click for the context menu
 `Ctrl+Z` / `Ctrl+Shift+Z` · `Ctrl+D` duplicate · `Ctrl+A` all · `Ctrl+E` export
+`Ctrl+G` group · `Ctrl+Shift+G` ungroup · `Ctrl+R` repeat · `Ctrl+Shift+C` copy as SVG
 `Delete` · `R` reroll the hand · `[` `]` layer order · arrows nudge
 `Alt`+drag duplicate · `Shift`+resize keeps proportions · `Ctrl`+drag ignores snapping
 
@@ -182,5 +207,3 @@ silently blowing the quota.
 
 It's static. Drop the folder on Netlify, Vercel, GitHub Pages, or any host.
 Nothing runs server-side and nothing leaves the browser.
-"# scrawl" 
-"# scrawl" 
