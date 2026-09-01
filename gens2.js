@@ -168,8 +168,11 @@
       const y = 50, s = p.scale;
       if (p.style === 5) { h.line(4, y - s * .4, 96, y - s * .4); h.line(4, y + s * .4, 96, y + s * .4); return; }
       if (p.style !== 0 && p.style !== 1) { h.line(4, y, 30, y); h.line(70, y, 96, y); }
+      /* the repeats have to fit the box: at 20 of them at size 22 a fixed
+         2.4x pitch is a thousand units wide, i.e. mostly off the item */
+      const pitch = Math.min(s * 2.4, 92 / Math.max(1, p.count));
       for (let i = 0; i < p.count; i++) {
-        const x = p.count === 1 ? 50 : 50 + (i - (p.count - 1) / 2) * (s * 2.4);
+        const x = p.count === 1 ? 50 : 50 + (i - (p.count - 1) / 2) * pitch;
         if (p.style === 0) h.dot(x, y, s * .28);
         if (p.style === 1) h.shape([[x, y - s], [x + s * .7, y], [x, y + s], [x - s * .7, y]], { closed: true, sharp: true });
         if (p.style === 2) h.curve([[x - s, y], [x - s / 2, y - s * .7], [x, y], [x + s / 2, y + s * .7], [x + s, y]]);

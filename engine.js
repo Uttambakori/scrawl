@@ -58,6 +58,11 @@ class Hand {
     this.fillMode = opts.fillMode ?? 'none';   // none | solid | hatch | scribble | dots
     this.fillGap = opts.fillGap ?? 4;
     this.fillAngle = opts.fillAngle ?? -40;
+    /* How much of a repeating detail is worth emitting. A library
+       thumbnail is ~64px: a fill of a thousand marks there is a grey
+       smudge that costs a thousand paths. Generators that emit many
+       small marks scale their budget by this; 1 is full size. */
+    this.detail = opts.detail ?? 1;
     this.strokes = [];
     this._clip = null;
     this.lastD = '';

@@ -34,7 +34,11 @@
   let tool = 'select', snapOn = true;
   const penOpts = { smooth: 1, closed: 1 };
 
-  const presetByName = n => PRESETS.find(p => p.name === n);
+  /* Names are only unique inside a tradition — Warli and Gond both
+     have a 'Dot border'. A template asks within its own style first, so
+     it can never pick up another tradition's piece by accident. */
+  const presetByName = (n, style) =>
+    (style && PRESETS.find(p => p.name === n && p.style === style)) || PRESETS.find(p => p.name === n);
   function baseWeight(d) { const dd = d || doc; return +(((dd ? dd.w + dd.h : 2160) / 2) / 1080 * 3.2).toFixed(2); }
   function defaultStyle(d) {
     const hh = (S.STYLES && S.styleOf(libStyle).hand) || { rough: 1.1, bow: 1, passes: 2, weight: 3.2, fillMode: 'none' };
@@ -977,7 +981,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
         it.font = sl.font || 'DM Sans'; it.caps = sl.caps || 0;
         it.align = sl.align || 'middle'; it.letter = sl.ls || 0; it.lineH = sl.lh || 1.08;
       } else {
-        const pre = presetByName(sl.p); if (!pre) return;
+        const pre = presetByName(sl.p, tpl.style); if (!pre) return;
         it = itemFromPreset(pre, box, d, true);
       }
       if (sl.c !== undefined) it.st.stroke = sl.c;
@@ -1298,7 +1302,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   }
   let thumbN = 0;
   function thumbFor(pre, colors, paper) {
-    const h = new Hand(pre.seed, { rough: 1.05, bow: 1, passes: 2, fillMode: 'none' });
+    const h = new Hand(pre.seed, { rough: 1.05, bow: 1, passes: 2, fillMode: 'none', detail: .3 });
     if (GENS[pre.gen].cat === 'Patterns') h.clipStart('M0 0H100V100H0Z');
     try { GENS[pre.gen].draw(h, pre.params); } catch (e) { }
     h.clipEnd();

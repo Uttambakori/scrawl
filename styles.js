@@ -5,8 +5,9 @@
    about ground, pigment, line and fill. Warli is solid white rice
    paste on a cow-dung and earth ground, painted with confidence —
    so it wants near-zero wobble and filled silhouettes. Gond is the
-   opposite: clean outlines packed with signature fills (comb
-   lines, rows of ovals, bands of dots).
+   exact opposite and is built the opposite way in code: a clean
+   outline with a signature packed inside it (comb lines, rows of
+   seeds, bands of dots), where the fill carries the authorship.
 
    Each pack sets:
      palettes  the grounds and pigments the tradition actually used
@@ -37,6 +38,31 @@
       canvas: ['Square 1080', 1080, 1080],
       texture: 'rough', textureAmt: 0.16,
       cats: ['Figures', 'Compositions', 'Nature', 'Animals', 'Village', 'Borders'],
+    },
+
+    gond: {
+      key: 'gond',
+      name: 'Gond',
+      where: 'Madhya Pradesh, India',
+      note: 'A clean outline packed with a signature — dots, a comb of rake lines, crescents, seeds. The fill is not decoration on the drawing, it is the part that says whose drawing it is.',
+      /* Earth pigment first — chui mitti clay, geru laterite, charcoal,
+         ramraj ochre — then the saturated grounds Pardhan Gond has
+         painted on since it moved from the wall to paper. */
+      palettes: [
+        ['Chui mitti', '#EFE3CB', '#2B2118', '#B4432B', '#3E6B4A', '#D18A2B'],
+        ['Geru wall', '#B4603C', '#F6ECD9', '#2B2118', '#D18A2B', '#3E6B4A'],
+        ['Charcoal ground', '#1E1B18', '#F2E6CE', '#E2603C', '#3E8A78', '#D9A72B'],
+        ['Indigo night', '#1E2E4A', '#F0E7D2', '#E86A3C', '#5FB3A6', '#E0B33C'],
+        ['Jangarh bright', '#123A5C', '#F5EEDC', '#D6336C', '#F2A93B', '#3EA88A'],
+        ['Ramraj yellow', '#E0B33C', '#241C14', '#B4432B', '#2E6B5A', '#7A4A9E'],
+        ['Forest', '#24402E', '#EFE6CE', '#E0A03C', '#C9503C', '#7FB08A'],
+      ],
+      /* brush on paper, not a finger on a wall: still confident, but it
+         breathes a little more than Warli does */
+      hand: { rough: 0.45, bow: 0.5, passes: 1, weight: 2.2, fillMode: 'none' },
+      canvas: ['Post 4:5', 1080, 1350],
+      texture: 'grain', textureAmt: 0.12,
+      cats: ['Figures', 'Animals', 'Birds', 'Nature', 'Compositions', 'Borders'],
     },
 
     sketch: {
