@@ -45,16 +45,18 @@
       fillMode: hh.fillMode, fillGap: 4.5, fillAngle: -40, opacity: 1, wobble: 0,
     };
   }
-  function fitBox(genKey, box) {
+  function fitBox(genKey, box, d, keepSize) {
     const g = GENS[genKey];
     if (!g) return box;
     /* free pieces know the shape they want to arrive at — a border is
        born long, a frame is born big, instead of everything landing
-       as the same square */
+       as the same square. A template already gave real coordinates,
+       so it passes keepSize and those win. Size against the document
+       being built, not whichever one happens to be open. */
     if (g.aspect === 'free') {
-      if (!g.place) return box;
-      const w = doc ? doc.w * g.place.w : box.w * 2 * g.place.w;
-      const h = doc ? doc.h * g.place.h : box.h * 2 * g.place.h;
+      const dd = d || doc;
+      if (keepSize || !g.place || !dd) return box;
+      const w = dd.w * g.place.w, h = dd.h * g.place.h;
       return { x: box.x + box.w / 2 - w / 2, y: box.y + box.h / 2 - h / 2, w, h };
     }
     const s = Math.min(box.w, box.h);
@@ -140,8 +142,8 @@
   function makeText(txt, box, d) {
     return { id: uid(), type: 'text', text: txt || 'Text', font: 'Archivo Black', align: 'middle', letter: 0, lineH: 1.08, caps: 0, fit: 1, size: 80, x: box.x, y: box.y, w: box.w, h: box.h, rot: 0, st: Object.assign(defaultStyle(d), { wobble: 0 }), hidden: 0, locked: 0, name: 'Text' };
   }
-  function itemFromPreset(pre, box, d) {
-    const it = makeItem(pre.gen, fitBox(pre.gen, box), d);
+  function itemFromPreset(pre, box, d, keepSize) {
+    const it = makeItem(pre.gen, fitBox(pre.gen, box, d, keepSize), d);
     it.params = Object.assign({}, pre.params);
     it.seed = pre.seed; it.name = pre.name;
     return it;
@@ -976,7 +978,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
         it.align = sl.align || 'middle'; it.letter = sl.ls || 0; it.lineH = sl.lh || 1.08;
       } else {
         const pre = presetByName(sl.p); if (!pre) return;
-        it = itemFromPreset(pre, box, d);
+        it = itemFromPreset(pre, box, d, true);
       }
       if (sl.c !== undefined) it.st.stroke = sl.c;
       if (sl.a !== undefined) it.st.accent = sl.a;
@@ -1328,6 +1330,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     }
     const q = libQuery.trim().toLowerCase();
     const mine = PRESETS.filter(p => p.style === libStyle);
+    { const sb = $('#libSearch'); if (sb) sb.placeholder = 'Search ' + mine.length + ' pieces…'; }
     const list = q ? mine.filter(p => p.search.includes(q)) : mine.filter(p => p.cat === libCat);
     host.appendChild(el('div', 'libmeta', q ? `${list.length} match${list.length === 1 ? '' : 'es'}` : `${list.length} in ${libCat}`));
     if (!q) { const st = S.styleOf(libStyle); if (st.note) host.appendChild(el('p', 'styleNote', st.note)); }
@@ -1828,7 +1831,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       else if (sl.big) pre = Math.random() < .5 ? anchor : pickOf(heavy);
       else pre = Math.random() < cohesion ? anchor : pickOf(pool.length ? pool : heavy);
 
-      const it = itemFromPreset(pre, fitBox(pre.gen, box));
+      const it = itemFromPreset(pre, box);
       it.seed = rint(0, 99999);
       Object.assign(it.st, hand);
       it.st.fillMode = Math.random() > .6 ? fillMode : 'none';

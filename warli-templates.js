@@ -29,7 +29,7 @@
       { p: 'Branching tree', x: 60, y: 30, w: 26, h: 34 },
       { p: 'Cow and calf', x: 62, y: 62, w: 34, h: 24 },
       { p: 'Human chain', x: 3, y: 66, w: 40, h: 22 },
-      { p: 'Carrying', x: 45, y: 64, w: 14, h: 24 },
+      { p: 'Water carrier', x: 45, y: 64, w: 14, h: 24 },
       { p: 'Water pots', x: 47, y: 86, w: 16, h: 11 },
       { p: 'Dot border', x: 0, y: 92, w: 100, h: 7 },
     ]

@@ -408,7 +408,8 @@
 
   def('halftone', 'Patterns', 'Halftone', [O('dir', 'Gradient', ['top', 'bottom', 'left', 'radial'], 0), N('gap', 'Gap', 3, 16, 7), N('max', 'Max dot', 1, 8, 3.4, .1)],
     (h, p) => {
-      for (let y = p.gap / 2; y < 100; y += p.gap) for (let x = p.gap / 2; x < 100; x += p.gap) {
+      const g = Math.max(1, p.gap);
+      for (let y = g / 2; y < 100; y += g) for (let x = g / 2; x < 100; x += g) {
         let u;
         if (p.dir === 0) u = 1 - y / 100; else if (p.dir === 1) u = y / 100;
         else if (p.dir === 2) u = 1 - x / 100; else u = 1 - Math.hypot(x - 50, y - 50) / 70;

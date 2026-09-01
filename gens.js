@@ -702,12 +702,12 @@
      PATTERNS — tile the whole box, good as backgrounds
      ========================================================== */
   def('patDots', 'Patterns', 'Dot grid', [N('gap', 'Gap', 3, 26, 9), N('size', 'Size', 0.4, 6, 1.4, 0.1), B('stagger', 'Stagger', true)],
-    (h, p) => { let r = 0; for (let y = p.gap / 2; y < 100; y += p.gap, r++) for (let x = p.gap / 2 + (p.stagger && r % 2 ? p.gap / 2 : 0); x < 100; x += p.gap) h.dot(x, y, p.size); });
+    (h, p) => { let r = 0; const g = Math.max(1, p.gap); for (let y = g / 2; y < 100; y += g, r++) for (let x = g / 2 + (p.stagger && r % 2 ? g / 2 : 0); x < 100; x += g) h.dot(x, y, p.size); });
 
   def('patLines', 'Patterns', 'Line field', [N('gap', 'Gap', 2, 26, 7), N('angle', 'Angle', 0, 180, 0), N('wob', 'Waviness', 0, 100, 0)],
     (h, p) => {
-      const a = p.angle * D;
-      for (let t = -70; t <= 70; t += p.gap) {
+      const a = p.angle * D, gap = Math.max(1, p.gap);
+      for (let t = -70; t <= 70; t += gap) {
         const pts = [];
         for (let i = 0; i <= 8; i++) {
           const e = -70 + (i / 8) * 140, off = Math.sin(i / 8 * TAU * 1.5 + t) * p.wob * 0.06;
