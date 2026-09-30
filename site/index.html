@@ -3,179 +3,254 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Scrawl · Paint with a number</title>
-<meta name="description" content="Scrawl paints Warli, Gond and sketchbook art from seeded rules, live in your browser, as clean SVG. Move your cursor and paint the wall.">
-<meta property="og:title" content="Scrawl · Paint with a number">
-<meta property="og:description" content="A drawing machine for Indian folk art traditions. Every mark is generated. Nothing is clip art.">
-<meta name="theme-color" content="#B4603C">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23121110'/%3E%3Ccircle cx='16' cy='7.5' r='3.2' fill='%23F4FF6B'/%3E%3Cpath d='M9 11.5h14L16 18zM16 18l-7 7h14z' fill='%23F4FF6B'/%3E%3C/svg%3E">
+<title>Scrawl · Indian folk art, drawn from the rules up</title>
+<meta name="description" content="Scrawl is a design studio for Warli, Gond, Madhubani, Pattachitra, Kalamkari and sketchbook art. Every mark is generated live, and everything exports as clean vector.">
+<meta property="og:title" content="Scrawl · Indian folk art, drawn from the rules up">
+<meta property="og:description" content="A design studio for Indian folk art traditions. Every mark is generated. Nothing is clip art.">
+<meta name="theme-color" content="#F7F5F0">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23141312'/%3E%3Ccircle cx='16' cy='8' r='3.2' fill='%23F7F5F0'/%3E%3Cpath d='M9.5 12h13L16 18.5zM16 18.5l-6.5 7h13z' fill='%23F7F5F0'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Anybody:ital,wdth,wght@0,50..150,100..900;1,50..150,100..900&family=Instrument+Sans:wght@400..700&family=JetBrains+Mono:wght@400;600&family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&family=Bebas+Neue&family=Anton&family=Archivo+Black&family=Caveat:wght@700&family=Chivo+Mono:wght@500&family=Alfa+Slab+One&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- faces the templates themselves use; not needed for first paint -->
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&family=Bebas+Neue&family=Anton&family=Archivo+Black&family=Caveat:wght@700&family=Chivo+Mono:wght@500&family=Alfa+Slab+One&family=Bricolage+Grotesque:wght@700&family=Space+Grotesk:wght@600&family=Syne:wght@700&family=Unbounded:wght@700&family=Playfair+Display:wght@700&family=Fraunces:wght@600&family=Cormorant+Garamond:wght@600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <link rel="stylesheet" href="site.css">
 </head>
 <body>
-<a class="skip" href="#versus">Skip to content</a>
+<a class="skip" href="#main">Skip to content</a>
 
-<!-- ================= NAV ================= -->
 <header class="nav" id="nav">
-  <a class="logo" href="#top" aria-label="Scrawl, back to top">scrawl<sup>*</sup></a>
-  <nav class="nav-links" aria-label="Sections">
-    <a href="#versus">Versus</a>
-    <a href="#traditions">Traditions</a>
-    <a href="#seed">Seeds</a>
-    <a href="#mural">Mural</a>
-    <a href="#studio">Studio</a>
-  </nav>
-  <a class="pill pill--nav" href="../index.html">Open editor <span aria-hidden="true">↗</span></a>
+  <div class="nav-in">
+    <a class="brand" href="#top" aria-label="Scrawl home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9"/><circle cx="16" cy="8" r="3.2"/><path d="M9.5 12h13L16 18.5zM16 18.5l-6.5 7h13z"/></svg>
+      <span>Scrawl</span>
+    </a>
+    <nav class="nav-links" id="navLinks" aria-label="Main">
+      <a href="#traditions">Traditions</a>
+      <a href="#how">How it works</a>
+      <a href="#templates">Templates</a>
+      <a href="#pricing">Pricing</a>
+      <a href="https://github.com/Uttambakori/scrawl">GitHub</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="btn btn--quiet hide-sm" href="#pricing">Get Pro</a>
+      <a class="btn btn--dark" data-editor href="../index.html">Open editor</a>
+      <button class="nav-menu" id="navMenu" aria-label="Menu" aria-expanded="false" aria-controls="navLinks"><span></span><span></span></button>
+    </div>
+  </div>
 </header>
 
-<main id="top">
+<main id="main">
 
-  <!-- ================= HERO: the wall you paint ================= -->
-  <section class="hero" id="hero" aria-label="Paint the wall">
-    <div class="wall" id="wall" aria-hidden="true"></div>
-    <h1 class="hero-type" id="heroType">
-      <span class="fit">Paint</span>
-      <span class="fit">with a</span>
-      <span class="fit">number</span>
-    </h1>
-    <div class="hero-bar">
-      <div class="switch3" role="radiogroup" aria-label="Tradition to paint in" id="heroStyles"></div>
-      <p class="readout" aria-live="polite"><span class="hint-fine">Move your cursor to paint.</span><span class="hint-touch">Tap to paint.</span> <b id="readout"></b></p>
-      <button class="pill pill--ghost" id="clearWall">Wash the wall</button>
-    </div>
-  </section>
-
-  <!-- ================= TICKER ================= -->
-  <div class="ticker" aria-hidden="true">
-    <div class="tick tick--a"><div class="tick-track" id="tickA"></div></div>
-    <div class="tick tick--b"><div class="tick-track" id="tickB"></div></div>
-  </div>
-
-  <section class="intro">
-    <p class="intro-text">Scrawl is a drawing machine for folk art. Nothing in it is clip art. <em>Every mark is generated from a rule and a number</em>, so the same seed gives the same drawing forever, and a new one gives you a hand that has never drawn before. It all runs in your browser and comes out as clean vector.</p>
-  </section>
-
-  <!-- ================= VERSUS: same subject, opposite rules ================= -->
-  <section class="versus" id="versus">
-    <header class="block-head">
-      <h2 class="fitline"><span class="fit">Same deer.</span><span class="fit">Opposite rules.</span></h2>
-      <p class="block-lede">Warli and Gond both draw the deer, the peacock and the water carrier, and they look nothing alike, because the rules underneath are opposite. Drag the line.</p>
-    </header>
-    <div class="vs" id="vs">
-      <div class="vs-side vs-a" id="vsA"></div>
-      <div class="vs-side vs-b" id="vsB"></div>
-      <div class="vs-handle" id="vsHandle" role="slider" tabindex="0" aria-label="Compare traditions" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"><span>⟷</span></div>
-      <p class="vs-tag vs-tag--a" id="vsTagA"></p>
-      <p class="vs-tag vs-tag--b" id="vsTagB"></p>
-    </div>
-    <div class="subjects" id="subjects" role="radiogroup" aria-label="Subject"></div>
-  </section>
-
-  <!-- ================= TRADITIONS accordion ================= -->
-  <section class="traditions" id="traditions">
-    <header class="block-head">
-      <h2 class="fitline"><span class="fit" id="tradCount">Three rulebooks</span></h2>
-      <p class="block-lede">Switching tradition swaps the whole discipline at once: the grounds and pigments it actually used, how the brush behaves, how a shape is filled. Open one. Click a drawing to redraw it, click a swatch to repaint the wall.</p>
-    </header>
-    <div class="accordion" id="accordion"></div>
-  </section>
-
-  <!-- ================= SEED MACHINE ================= -->
-  <section class="seed" id="seed">
-    <div class="seed-left">
-      <h2 class="seed-title">Pull for a <br>new hand</h2>
-      <div class="reels" id="reels" aria-hidden="true"></div>
-      <p class="sr-only" id="seedNow" aria-live="polite"></p>
-      <div class="seed-controls">
-        <button class="lever" id="lever"><span>Pull</span></button>
-        <div class="piece-pick" id="piecePick" role="radiogroup" aria-label="Piece"></div>
+  <!-- ============ HERO ============ -->
+  <section class="hero" id="top">
+    <div class="wrap hero-copy">
+      <a class="eyebrow" href="#traditions"><span class="eyebrow-dot"></span><span id="eyebrow">Six traditions, one studio</span><span aria-hidden="true">→</span></a>
+      <h1 class="h-hero">Indian folk art,<br>drawn from the rules up.</h1>
+      <p class="lede" id="heroLede">Scrawl is a design studio for Indian folk art. Every mark is generated from the rules of the tradition, so no two drawings are the same, and everything exports as clean vector.</p>
+      <div class="cta-row">
+        <a class="btn btn--dark btn--lg" data-editor href="../index.html">Start drawing free</a>
+        <a class="btn btn--line btn--lg" href="#pricing">See pricing</a>
       </div>
-      <p class="seed-note">Same number, same drawing, forever. Every piece in the library has <b>4,294,967,296</b> of them, and the number turns the dials too.</p>
+      <p class="fine">Free forever. No account, no install.</p>
     </div>
-    <figure class="seed-frame">
-      <div class="seed-art" id="seedArt"></div>
-      <figcaption id="seedCap"></figcaption>
-    </figure>
-  </section>
 
-  <!-- ================= MURAL: horizontal wall ================= -->
-  <section class="mural" id="mural">
-    <div class="mural-sticky">
-      <h2 class="mural-title"><span>No hero.</span><span>No foreground.</span></h2>
-      <p class="mural-note">A Warli wall weaves everything across one surface at one scale. This one is being generated as you scroll.</p>
-      <div class="mural-scroller" id="muralScroller"><div class="mural-art" id="muralArt"></div></div>
-    </div>
-  </section>
-
-  <!-- ================= STUDIO bento ================= -->
-  <section class="studio" id="studio">
-    <header class="block-head">
-      <h2 class="fitline"><span class="fit">A whole studio</span><span class="fit">in one tab</span></h2>
-    </header>
-    <div class="bento">
-      <article class="tile t-colour" id="tColour">
-        <h3>Recolour everything</h3>
-        <p>Pieces draw with roles, not colours. Change the palette and every drawing on the board repaints itself.</p>
-        <div class="t-colour-art" id="colourArt"></div>
-        <div class="t-swatches" id="colourSwatches" role="radiogroup" aria-label="Palette"></div>
-      </article>
-      <article class="tile t-hand">
-        <h3>Break the hand</h3>
-        <div class="t-hand-art" id="handArt"></div>
-        <label class="t-slider"><span>Wobble <output id="handOut">0.28</output></span><input type="range" id="handRange" min="0" max="2.6" step="0.01" value="0.28"></label>
-      </article>
-      <article class="tile t-zero">
-        <b class="zero">0</b>
-        <h3>servers</h3>
-        <p>No account, no upload. Your work saves itself in the browser.</p>
-      </article>
-      <article class="tile t-vector" id="tVector">
-        <h3>Vector all the way</h3>
-        <p>Hover to zoom. It prints, cuts on a vinyl cutter and scales to a billboard.</p>
-        <div class="t-vector-art" id="vectorArt"></div>
-      </article>
-      <article class="tile t-templates">
-        <h3>Start from a finished wall</h3>
-        <div class="fan" id="fan"></div>
-      </article>
-      <article class="tile t-export">
-        <h3>Export</h3>
-        <ul class="chips">
-          <li>PNG 1× 2× 4×</li><li>SVG</li><li>Print PDF</li><li>Bleed + crop marks</li><li>Project file</li>
-        </ul>
-      </article>
-      <article class="tile t-numbers" id="numbers"></article>
-      <article class="tile t-code">
-        <h3>Add a tradition in four files</h3>
-        <pre><code><span class="c">// styles.js</span>
-warli: {
-  ground: <span class="s">'red ochre'</span>,
-  hand: { rough: <span class="n">0.28</span>, passes: <span class="n">1</span> },
-  cats: [<span class="s">'Figures'</span>, <span class="s">'Village'</span>, …],
-}</code></pre>
-      </article>
+    <!-- A working miniature of the editor -->
+    <div class="wrap wrap--wide">
+      <div class="app" id="app" aria-label="Live demo of the Scrawl editor">
+        <div class="app-bar">
+          <span class="app-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="16" cy="8" r="3.2"/><path d="M9.5 12h13L16 18.5zM16 18.5l-6.5 7h13z"/></svg></span>
+          <p class="app-file"><span id="appTradName">Warli</span><span class="sl">/</span><b id="appFile">Village wall</b></p>
+          <div class="app-bar-r">
+            <span class="app-live"><i></i>Live</span>
+            <a class="app-open" data-editor href="../index.html">Open in editor</a>
+          </div>
+        </div>
+        <div class="app-body">
+          <aside class="app-left">
+            <p class="app-label">Traditions</p>
+            <div class="app-trads" id="appTrads" role="tablist" aria-label="Tradition"></div>
+            <p class="app-label app-label--tpl">Templates</p>
+            <div class="app-tpls" id="appTpls" role="listbox" aria-label="Template"></div>
+          </aside>
+          <div class="app-canvas" id="appCanvas">
+            <div class="board" id="board">
+              <span class="board-label" id="boardLabel"></span>
+              <div class="board-art" id="boardArt"></div>
+            </div>
+          </div>
+          <aside class="app-right">
+            <div class="insp">
+              <p class="app-label">Palette</p>
+              <div class="pals" id="appPals" role="radiogroup" aria-label="Palette"></div>
+              <p class="insp-sub" id="palName"></p>
+            </div>
+            <div class="insp">
+              <p class="app-label">Hand</p>
+              <label class="range"><span>Wobble</span><input type="range" id="appWobble" min="0" max="1.6" step="0.01"><output id="appWobbleOut"></output></label>
+            </div>
+            <div class="insp">
+              <p class="app-label">Seed</p>
+              <div class="seed-row"><code id="appSeed">0000</code><button class="btn btn--sm btn--dark" id="appShuffle">Shuffle</button></div>
+            </div>
+            <div class="insp insp--note">
+              <p class="app-label">The rule</p>
+              <p class="insp-note" id="appNote"></p>
+            </div>
+          </aside>
+        </div>
+      </div>
+      <p class="app-caption">This is the real engine, running on this page. Pick a tradition, change the palette or shuffle the seed.</p>
     </div>
   </section>
 
-  <!-- ================= END ================= -->
-  <section class="end" id="end">
-    <p class="end-kick">Free. Open source. Runs in this tab.</p>
-    <a class="end-cta" href="../index.html"><span>Open the editor</span><span class="end-arrow" aria-hidden="true">↗</span></a>
-    <div class="giant" id="giant" aria-label="Scrawl"></div>
-    <footer class="foot">
-      <p>Scrawl draws from the rules of living art traditions, each one made and kept alive by communities of artists across India. If you love the look, find and buy work from the artists themselves.</p>
-      <p class="foot-links"><a href="https://github.com/Uttambakori/scrawl">GitHub</a><a href="../index.html">Editor</a><span>Every drawing on this page was generated live.</span></p>
-    </footer>
+  <!-- ============ PROOF STRIP ============ -->
+  <section class="stats" aria-label="Scrawl in numbers">
+    <div class="wrap stats-in" id="stats"></div>
   </section>
 
+  <!-- ============ TRADITIONS ============ -->
+  <section class="section" id="traditions">
+    <div class="wrap">
+      <header class="sec-head">
+        <p class="kicker">Traditions</p>
+        <h2 class="h-sec" id="tradTitle">Six traditions. Each with its own rules.</h2>
+        <p class="sec-lede">A tradition in Scrawl is not a sticker pack. It is a discipline: the grounds and pigments artists actually used, how the brush moves, and how a shape gets filled. Click a drawing to redraw it.</p>
+      </header>
+      <div class="trad-grid" id="tradGrid"></div>
+    </div>
+  </section>
+
+  <!-- ============ LIBRARY ============ -->
+  <section class="library" aria-labelledby="libTitle">
+    <div class="wrap lib-head">
+      <h2 class="h-sec" id="libTitle">A library that draws itself.</h2>
+      <p class="sec-lede" id="libLede">Every piece is a small program, not a picture. Change a dial or a seed and it draws again, in the same hand.</p>
+    </div>
+    <div class="marquee" id="marquee" aria-hidden="true"></div>
+  </section>
+
+  <!-- ============ HOW IT WORKS ============ -->
+  <section class="section" id="how">
+    <div class="wrap">
+      <header class="sec-head">
+        <p class="kicker">How it works</p>
+        <h2 class="h-sec">From a blank page to print in three steps.</h2>
+      </header>
+      <ol class="steps">
+        <li class="step">
+          <div class="step-vis step-vis--trads" id="stepTrads"></div>
+          <p class="step-n">01</p>
+          <h3>Pick a tradition</h3>
+          <p>Every tradition sets its own ground, pigments and brush. Switch it and the whole page follows.</p>
+        </li>
+        <li class="step">
+          <div class="step-vis step-vis--seed" id="stepSeed" role="button" tabindex="0" aria-label="Shuffle this drawing"></div>
+          <p class="step-n">02</p>
+          <h3>Make it yours</h3>
+          <p>Drop in pieces, shuffle the seed, turn the dials. The same seed always gives the same drawing. <button class="link" id="stepShuffle">Try a new seed</button></p>
+        </li>
+        <li class="step">
+          <div class="step-vis step-vis--export" id="stepExport"></div>
+          <p class="step-n">03</p>
+          <h3>Export anywhere</h3>
+          <p>PNG, JPG and WebP on every plan. Pro adds SVG, 4× and print PDF with bleed and crop marks.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ============ TEMPLATES ============ -->
+  <section class="section section--tint" id="templates">
+    <div class="wrap">
+      <header class="sec-head sec-head--row">
+        <div>
+          <p class="kicker">Templates</p>
+          <h2 class="h-sec" id="tplTitle">Start from a finished design.</h2>
+        </div>
+        <div class="chips" id="tplFilter" role="tablist" aria-label="Filter templates"></div>
+      </header>
+    </div>
+    <div class="tpl-rail" id="tplRail" tabindex="0" aria-label="Templates"></div>
+    <div class="wrap tpl-nav">
+      <button class="round" id="tplPrev" aria-label="Previous templates">←</button>
+      <button class="round" id="tplNext" aria-label="Next templates">→</button>
+    </div>
+  </section>
+
+  <!-- ============ FEATURES ============ -->
+  <section class="section" id="features">
+    <div class="wrap">
+      <header class="sec-head">
+        <p class="kicker">Built properly</p>
+        <h2 class="h-sec">Made for work that ships.</h2>
+      </header>
+      <div class="feats" id="feats"></div>
+    </div>
+  </section>
+
+  <!-- ============ PRICING ============ -->
+  <section class="section section--dark" id="pricing">
+    <div class="wrap">
+      <header class="sec-head sec-head--center">
+        <p class="kicker">Pricing</p>
+        <h2 class="h-sec">Start free. Upgrade when it's work.</h2>
+        <p class="sec-lede">Free covers everything you need to make the work. Pro is for getting it out into the world.</p>
+        <p class="beta-note" id="planBeta"><span class="eyebrow-dot"></span>Scrawl is in beta, so every Pro feature is free until launch.</p>
+      </header>
+      <div class="plans" id="plans"></div>
+      <details class="compare">
+        <summary><span>Compare every feature</span><i aria-hidden="true"></i></summary>
+        <div class="compare-scroll"><table id="compare"></table></div>
+      </details>
+    </div>
+  </section>
+
+  <!-- ============ FAQ ============ -->
+  <section class="section" id="faq">
+    <div class="wrap faq-wrap">
+      <header class="sec-head">
+        <p class="kicker">Questions</p>
+        <h2 class="h-sec">Good to know.</h2>
+      </header>
+      <div class="faq" id="faqList"></div>
+    </div>
+  </section>
+
+  <!-- ============ CLOSE ============ -->
+  <section class="close">
+    <div class="wrap close-in">
+      <div class="close-art" id="closeArt" aria-hidden="true"></div>
+      <div class="close-copy">
+        <h2 class="h-sec">Make something that looks hand-made.</h2>
+        <p class="sec-lede">Open the editor and draw your first wall in under a minute.</p>
+        <div class="cta-row">
+          <a class="btn btn--dark btn--lg" data-editor href="../index.html">Start drawing free</a>
+          <a class="btn btn--line btn--lg" href="#pricing">See pricing</a>
+        </div>
+      </div>
+    </div>
+  </section>
 </main>
 
-<!-- The editor's own engine and packs, loaded in the same order the
-     editor loads them: the list is read from ../index.html, so a new
-     tradition added to the editor appears here with no change to this
-     page. The fixed list is only a fallback for opening from disk. -->
+<footer class="foot">
+  <div class="wrap foot-in">
+    <div class="foot-brand">
+      <a class="brand" href="#top"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9"/><circle cx="16" cy="8" r="3.2"/><path d="M9.5 12h13L16 18.5zM16 18.5l-6.5 7h13z"/></svg><span>Scrawl</span></a>
+      <p>Scrawl draws from the rules of living art traditions, each one made and kept alive by communities of artists across India. If you love the look, find and buy work from the artists themselves.</p>
+    </div>
+    <nav class="foot-cols" aria-label="Footer">
+      <div><p>Product</p><a data-editor href="../index.html">Editor</a><a href="#traditions">Traditions</a><a href="#templates">Templates</a><a href="#pricing">Pricing</a></div>
+      <div><p>Project</p><a href="https://github.com/Uttambakori/scrawl">GitHub</a><a href="#faq">Questions</a></div>
+    </nav>
+  </div>
+  <div class="wrap foot-base"><span>© <span id="year">2026</span> Scrawl</span><span>Every drawing on this page was generated live.</span></div>
+</footer>
+
+<!-- The editor's own engine and packs, loaded in the order the editor
+     loads them. The list is read from ../index.html (everything before
+     app.js), so a tradition added to the editor appears here with no
+     change to this page. The fixed list is only a fallback. -->
 <script>
 (function () {
   var FALLBACK = ['engine.js', 'icons.js', 'gens.js', 'gens2.js', 'gens3.js', 'gens4.js', 'presets.js', 'presets2.js', 'presets3.js',
@@ -194,7 +269,10 @@ warli: {
   }
   fetch('../index.html').then(function (r) { if (!r.ok) throw 0; return r.text(); }).then(function (html) {
     var list = [], re = /<script\s+src="([^"]+)"/g, m;
-    while ((m = re.exec(html))) if (!/^(https?:)?\/\//.test(m[1]) && m[1] !== 'app.js') list.push(m[1]);
+    while ((m = re.exec(html))) {
+      if (m[1] === 'app.js') break;
+      if (!/^(https?:)?\/\//.test(m[1])) list.push(m[1]);
+    }
     load(list.length ? list : FALLBACK);
   }).catch(function () { load(FALLBACK); });
 })();

@@ -345,8 +345,11 @@ the list of `<script>` tags from the editor's `index.html`, loads the same
 engine and packs in the same order, and draws every illustration live.
 Traditions, palettes, piece counts and templates all come from the loaded
 packs, so a tradition added to the editor appears on the site with no change
-to `site/`. Optional per-tradition colours for the site live in the `THEME` and
-`LATER` tables at the top of `site/site.js`.
+to `site/`. Everything else worth changing without reading the code is in
+`CONFIG` at the top of `site/site.js`: the editor link, the optional
+per-tradition picks (palette, hero template, showcase pieces) and the plan
+fallback. Pricing is read from the editor's `plan.js` when it is present, so
+prices, Pro features and checkout links are set in one place.
 
 Serve the repository root (for GitHub Pages: deploy from the `main` branch,
 root folder) and open `/site/`. Its "Open the editor" links point at `../index.html`.

@@ -115,7 +115,9 @@
 
   function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]); }
 
-  /* A whole template, rendered as a finished poster. Text is laid out
+  /* A whole template, rendered as a finished poster. o.pal picks the
+     palette, o.seed re-rolls the hand, o.hand overrides it (wobble).
+     Text is laid out
      roughly here and fitted to its box after it lands in the page
      (see fitText), the way the editor auto-fits a text box. */
   function template(tpl, o) {
@@ -144,7 +146,9 @@
       const slots = { c: sl.c != null ? sl.c : 0, a: sl.a != null ? sl.a : 1, f: sl.f != null ? sl.f : 4 };
       const m = pieceMarkup(pre, box, {
         colors: pal.colors, slots, weight, rot: sl.rot, detail: o.detail != null ? o.detail : .6,
-        hand: sl.fill ? { fillMode: sl.fill } : null, animate: o.animate,
+        hand: Object.assign({}, o.hand, sl.fill ? { fillMode: sl.fill } : null), animate: o.animate,
+        /* o.seed re-rolls every hand in the layout at once */
+        seed: o.seed ? (pre.seed + o.seed * 7919 + i * 131) % 4294967296 : null,
       });
       defs += m.defs;
       body += sl.op != null ? `<g opacity="${sl.op}">${m.body}</g>` : m.body;
