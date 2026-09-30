@@ -176,7 +176,12 @@
   function makeItem(genKey, box, d) {
     const g = GENS[genKey], params = {};
     g.params.forEach(pa => params[pa.k] = pa.def);
-    return { id: uid(), type: 'shape', gen: genKey, params, seed: rint(0, 99999), x: box.x, y: box.y, w: box.w, h: box.h, rot: 0, st: defaultStyle(d, g.style), hidden: 0, locked: 0, name: g.label };
+    const st = defaultStyle(d, g.style);
+    /* a tradition can claim a palette slot for a role — Madhubani's
+       `fill` is its third pigment, not the paper */
+    const sl = S.STYLES && S.STYLES[g.style] && S.STYLES[g.style].slots;
+    if (sl) Object.assign(st, sl);
+    return { id: uid(), type: 'shape', gen: genKey, params, seed: rint(0, 99999), x: box.x, y: box.y, w: box.w, h: box.h, rot: 0, st, hidden: 0, locked: 0, name: g.label };
   }
   function makeText(txt, box, d) {
     return { id: uid(), type: 'text', text: txt || 'Text', font: 'Archivo Black', weight: 400, align: 'middle', letter: 0, lineH: 1.08, caps: 0, fit: 1, size: 80, x: box.x, y: box.y, w: box.w, h: box.h, rot: 0, st: Object.assign(defaultStyle(d), { wobble: 0 }), hidden: 0, locked: 0, name: 'Text' };
@@ -1416,6 +1421,8 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   let thumbN = 0;
   function thumbFor(pre, colors, paper) {
     const h = new Hand(pre.seed, { rough: 1.05, bow: 1, passes: 2, fillMode: 'none', detail: .3 });
+    const sl = S.STYLES && S.styleOf(pre.style).slots;
+    const fillC = sl && sl.fill !== undefined && doc ? doc.colors[sl.fill] : paper;
     if (GENS[pre.gen].cat === 'Patterns') h.clipStart('M0 0H100V100H0Z');
     try { GENS[pre.gen].draw(h, pre.params); } catch (e) { }
     h.clipEnd();
@@ -1423,8 +1430,8 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     h.strokes.forEach(st => {
       let ca = '';
       if (st.clip) { const id = 't' + (thumbN++) + '_' + (n++); clips += `<clipPath id="${id}"><path d="${st.clip}"/></clipPath>`; ca = ` clip-path="url(#${id})"`; }
-      const sc = st.role === 'accent' ? colors[1] : colors[0];
-      const fc = st.fill === 'none' ? 'none' : (st.fill === 'accent' ? colors[1] : st.fill === 'fill' ? paper : colors[0]);
+      const sc = st.role === 'accent' ? colors[1] : st.role === 'fill' ? fillC : colors[0];
+      const fc = st.fill === 'none' ? 'none' : (st.fill === 'accent' ? colors[1] : st.fill === 'fill' ? fillC : colors[0]);
       body += `<path d="${st.d}" fill="${fc}" stroke="${sc}" stroke-width="${(st.w * 1.9).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"${ca}/>`;
     });
     return `<svg viewBox="-8 -8 116 116">${clips ? `<defs>${clips}</defs>` : ''}${body}</svg>`;
@@ -2185,7 +2192,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       Object.assign(it.st, hand);
       it.st.fillMode = Math.random() > .6 ? fillMode : 'none';
       it.st.fillGap = +rnd(2.5, 9).toFixed(1); it.st.fillAngle = rint(-80, 80);
-      it.st.stroke = 0; it.st.accent = Math.random() > .3 ? 1 : 2; it.st.fill = Math.random() > .65 ? 1 : 4;
+      it.st.stroke = 0; it.st.accent = Math.random() > .3 ? 1 : 2; it.st.fill = (S.styleOf(pre.style).slots || {}).fill ?? (Math.random() > .65 ? 1 : 4);
       it.rot = Math.random() > .75 ? +rnd(-10, 10).toFixed(1) : 0;
       if (sl.frame) { it.rot = 0; it.st.fillMode = 'none'; }
       if (sl.pattern) { it.st.opacity = +rnd(.14, .42).toFixed(2); it.st.stroke = 3; it.st.fillMode = 'none'; it.rot = 0; }

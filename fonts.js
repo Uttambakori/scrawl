@@ -252,6 +252,8 @@
     gond: ['Baloo 2', 'Rozha One', 'Eczar', 'Laila', 'Kurale', 'Yatra One', 'Tiro Devanagari Hindi', 'Fraunces', 'Shrikhand', 'Modak', 'Sahitya', 'Amita'],
     sketch: ['Caveat', 'Permanent Marker', 'Gloria Hallelujah', 'Archivo Black', 'Anton', 'DM Mono', 'Instrument Serif', 'Fraunces', 'Space Grotesk', 'Bricolage Grotesque', 'Rock Salt', 'Special Elite'],
     madhubani: ['Rozha One', 'Tiro Devanagari Hindi', 'Kurale', 'Amita', 'Sahitya', 'Laila', 'Kalam', 'Eczar', 'Yatra One', 'Martel', 'Cinzel', 'Shrikhand'],
+    pattachitra: ['Baloo Bhaina 2', 'Noto Sans Oriya', 'Cinzel', 'Marcellus', 'Rozha One', 'Yeseva One', 'Laila', 'Cormorant Garamond', 'Eczar', 'Kurale', 'Playfair Display', 'Amita'],
+    kalamkari: ['Ramaraja', 'Suravaram', 'Baloo Tammudu 2', 'NTR', 'Mandali', 'Cormorant Garamond', 'Spectral', 'Marcellus', 'Laila', 'Rozha One', 'Abril Fatface', 'Kalam'],
   };
   const SUGGEST_ANY = ['Kalam', 'Rozha One', 'Yatra One', 'Amita', 'Baloo 2', 'Eczar', 'Fraunces', 'Instrument Serif', 'Archivo Black', 'Caveat', 'DM Sans', 'Space Grotesk'];
 
