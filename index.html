@@ -7,7 +7,8 @@
 <meta name="description" content="A drawing machine. Every mark is generated, so nothing is stock.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Anton&family=Bebas+Neue&family=Caveat:wght@700&family=Permanent+Marker&family=Gloria+Hallelujah&family=Space+Grotesk:wght@400;700&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&family=Libre+Baskerville:wght@700&family=Rock+Salt&family=Shadows+Into+Light&family=Bungee&family=Righteous&family=Syne:wght@800&family=Instrument+Serif&family=Fraunces:opsz,wght@9..144,700&family=Bricolage+Grotesque:wght@800&family=Unbounded:wght@700&family=Chivo+Mono:wght@500&family=Sora:wght@700&family=Outfit:wght@700&family=Lora:wght@600&family=Cormorant+Garamond:wght@700&family=Alfa+Slab+One&family=Abril+Fatface&family=Kalam:wght@700&family=Patrick+Hand&family=Architects+Daughter&family=Special+Elite&family=Silkscreen&display=swap" rel="stylesheet">
+<!-- the interface faces; artwork fonts load on demand from fonts.js -->
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400&family=Permanent+Marker&display=swap" rel="stylesheet">
 <style>
 /* ================= tokens ================= */
 :root{
@@ -303,6 +304,7 @@ kbd{background:var(--sunk);border:1px solid var(--line);border-bottom-width:2px;
 
 @media (max-width:1200px){:root{--leftW:240px;--rightW:266px}.libgrid{grid-template-columns:repeat(2,1fr)}#pals{grid-template-columns:repeat(6,1fr)}}
 </style>
+<link rel="stylesheet" href="studio.css">
 </head>
 <body>
 
@@ -315,10 +317,13 @@ kbd{background:var(--sunk);border:1px solid var(--line);border-bottom-width:2px;
     </svg>
     <b>Motifs</b>
   </div>
+  <nav id="menubar" class="menubar" aria-label="Menu"></nav>
+  <div class="sep"></div>
   <button id="btnHome" class="bordered" data-icon="files:15" data-label="Files"></button>
   <button id="btnNew" class="bordered" data-icon="plus:15" data-label="New"></button>
   <div class="sep"></div>
   <div id="docName" contenteditable="true" spellcheck="false" title="Click to rename">Untitled</div>
+  <span id="saveState" data-state="ok">Saved</span>
   <div class="sep"></div>
   <button id="btnUndo" class="ico" title="Undo — Ctrl Z" data-icon="undo:16"></button>
   <button id="btnRedo" class="ico" title="Redo — Ctrl Shift Z" data-icon="redo:16"></button>
@@ -335,7 +340,8 @@ kbd{background:var(--sunk);border:1px solid var(--line);border-bottom-width:2px;
   <button id="btnGroup"   class="ico" title="Group (Ctrl G)"   data-icon="group:16"></button>
   <button id="btnUngroup" class="ico" title="Ungroup (Ctrl Shift G)" data-icon="ungroup:16"></button>
   <div class="grow"></div>
-  <button id="btnKeys" class="ico" title="Keyboard shortcuts" data-icon="keyboard:16"></button>
+  <button id="btnCmd" class="cmdbtn" title="Search every command — Ctrl K"><span data-icon="search:14"></span><span class="cmdtxt">Search commands</span><kbd id="cmdKey">Ctrl K</kbd></button>
+  <button id="btnKeys" class="ico" title="Keyboard shortcuts — Ctrl /" data-icon="keyboard:16"></button>
   <button id="themeBtn" class="ico" title="Dark mode"></button>
   <button id="btnImport" class="ico" title="Place an SVG, or open a project file" data-icon="upload:16"></button>
   <div class="sep"></div>
@@ -357,6 +363,10 @@ kbd{background:var(--sunk);border:1px solid var(--line);border-bottom-width:2px;
 
   <main id="viewport" data-cursor="default">
     <div id="wrap"></div>
+    <canvas id="rulerX" class="ruler"></canvas>
+    <canvas id="rulerY" class="ruler"></canvas>
+    <div id="rulerCorner" class="ruler"></div>
+    <div id="status"></div>
     <button id="toggleLeft" class="panelTab" title="Hide library" data-icon="panelL:15"></button>
     <button id="toggleRight" class="panelTab" title="Hide properties" data-icon="panelR:15"></button>
     <div class="dock">
@@ -365,6 +375,9 @@ kbd{background:var(--sunk);border:1px solid var(--line);border-bottom-width:2px;
       <button data-tool="text"   class="ico" title="Text — T"     data-icon="text:17"></button>
       <button data-tool="pen"    class="ico" title="Pen — click points (P)" data-icon="pen:17"></button>
       <button data-tool="pencil"  class="ico" title="Pencil — draw freehand (B)" data-icon="brush:17"></button>
+      <button data-tool="rect"    class="ico" title="Rectangle — M" data-icon="rect:17"></button>
+      <button data-tool="ellipse" class="ico" title="Ellipse — O" data-icon="ellipse:17"></button>
+      <button data-tool="line"    class="ico" title="Line — L" data-icon="lineTool:17"></button>
       <div class="sep"></div>
       <button id="btnSurprise" data-icon="sparkle:16" data-label="Surprise"></button>
       <button id="btnSnap" class="ico" title="Snapping" data-icon="magnet:16"></button>
@@ -464,6 +477,8 @@ kbd{background:var(--sunk);border:1px solid var(--line);border-bottom-width:2px;
 <script src="warli-templates.js"></script>
 <script src="gond-templates.js"></script>
 <script src="data.js"></script>
+<script src="fonts.js"></script>
 <script src="app.js"></script>
+<script src="commands.js"></script>
 </body>
 </html>
