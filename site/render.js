@@ -73,14 +73,31 @@
     const sw = weight / (((b.w + b.h) / 200) || 1);
     const n = h.strokes.length;
     let defs = '', body = '';
+    /* A hatch or dot fill clips hundreds of marks to one shape: that
+       shape is defined once, and runs of unfilled marks that look the
+       same are joined into one path. Fewer nodes, same picture, and a
+       page that stays quick on an old machine. (Not when animating:
+       each mark then draws on in its own turn.) */
+    const clips = new Map();
+    let run = null;
+    const flush = () => { if (run) body += `<path d="${run.d}"${run.attrs}/>`; run = null; };
     h.strokes.forEach((st, i) => {
       let ca = '';
-      if (st.clip) { const id = 'k' + (uidN++); defs += `<clipPath id="${id}"><path d="${st.clip}"/></clipPath>`; ca = ` clip-path="url(#${id})"`; }
+      if (st.clip) {
+        let id = clips.get(st.clip);
+        if (!id) { id = 'k' + (uidN++); clips.set(st.clip, id); defs += `<clipPath id="${id}"><path d="${st.clip}"/></clipPath>`; }
+        ca = ` clip-path="url(#${id})"`;
+      }
       const stroke = cols[st.role === 'accent' ? slot.a : st.role === 'fill' ? slot.f : slot.c];
       const fill = st.fill === 'none' ? 'none' : cols[st.fill === 'accent' ? slot.a : st.fill === 'fill' ? slot.f : slot.c];
-      const anim = o.animate ? ` pathLength="1" style="--i:${(i / Math.max(1, n - 1)).toFixed(3)}"` : '';
-      body += `<path d="${st.d}" fill="${fill}" stroke="${stroke}" stroke-width="${(st.w * sw).toFixed(3)}" stroke-linecap="${st.cap}" stroke-linejoin="round"${st.op !== 1 ? ` opacity="${st.op}"` : ''}${ca}${anim}/>`;
+      const attrs = ` fill="${fill}" stroke="${stroke}" stroke-width="${(st.w * sw).toFixed(3)}" stroke-linecap="${st.cap}" stroke-linejoin="round"${st.op !== 1 ? ` opacity="${st.op}"` : ''}${ca}`;
+      if (o.animate) { body += `<path d="${st.d}"${attrs} pathLength="1" style="--i:${(i / Math.max(1, n - 1)).toFixed(3)}"/>`; return; }
+      if (fill === 'none' && st.op === 1 && run && run.attrs === attrs) { run.d += st.d; return; }
+      flush();
+      run = { d: st.d, attrs };
+      if (fill !== 'none' || st.op !== 1) flush();
     });
+    flush();
     const rot = o.rot ? ` rotate(${o.rot} ${b.w / 2} ${b.h / 2})` : '';
     return {
       defs,

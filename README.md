@@ -340,16 +340,28 @@ Nothing runs server-side and nothing leaves the browser.
 
 ## The website
 
-`site/` is Scrawl's marketing page. It has no art assets of its own: it reads
-the list of `<script>` tags from the editor's `index.html`, loads the same
-engine and packs in the same order, and draws every illustration live.
-Traditions, palettes, piece counts and templates all come from the loaded
-packs, so a tradition added to the editor appears on the site with no change
-to `site/`. Everything else worth changing without reading the code is in
-`CONFIG` at the top of `site/site.js`: the editor link, the optional
-per-tradition picks (the palette its room is painted in, the piece drawn in the opening, the rule its room is built on) and the plan
-fallback. Pricing is read from the editor's `plan.js` when it is present, so
-prices, Pro features and checkout links are set in one place.
+`site/` is Scrawl's marketing page: plain HTML, one stylesheet, one small
+script and one self-hosted font (Bricolage Grotesque, SIL Open Font License,
+in `site/fonts/`). It is built to stay quick on old laptops: nothing on it
+moves unless you touch it, and it does not run the drawing engine to show its
+pictures.
+
+Every picture is still drawn by the editor's own generators, just once, ahead
+of time. `site/build.js` loads the engine and packs in Node (in the order the
+editor's `index.html` lists them), writes the drawings to `site/art/` as SVG
+files, and fills the tradition cards and library counts in `site/index.html`.
+After adding or changing a tradition, run:
+
+    node site/build.js
+
+and commit what it changes. A new tradition gets a card with no other edit;
+its palette, peacock and one-line rule can be set in `TRAD` at the top of
+`build.js`.
+
+Only the "Have a go" demo runs the real engine, and it loads it when a
+visitor scrolls near. Prices are written in the page and mirror `plan.js`;
+when checkout pages exist, put them in `CONFIG.checkout` in `site/site.js` and
+the Pro buttons switch from "Free during beta" to buying.
 
 Serve the repository root (for GitHub Pages: deploy from the `main` branch,
 root folder) and open `/site/`. Its "Open the editor" links point at `../index.html`.
