@@ -288,6 +288,12 @@ kbd{background:var(--sunk);border:1px solid var(--line);border-bottom-width:2px;
   padding:7px 11px;font:13px 'DM Sans';color:var(--txt);outline:none}
 #homeSearch:focus{border-color:var(--blue)}
 #homeGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(206px,1fr));gap:18px}
+#homeFilters .chiprow{display:flex;flex-wrap:wrap;gap:5px;width:100%}
+#homeFilters .chiprow+.chiprow{margin-top:2px}
+.chip em{font-style:normal;opacity:.55;margin-left:3px}
+.tplgroup{grid-column:1/-1;margin:10px 0 -6px;font:600 14px 'DM Sans';display:flex;align-items:baseline;gap:8px}
+.tplgroup:first-child{margin-top:0}
+.tplgroup span{font:400 11.5px 'DM Sans';color:var(--dim)}
 .filecard{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:var(--rl);
   overflow:hidden;padding:0;text-align:left;display:flex;flex-direction:column;cursor:pointer}
 .filecard:hover{border-color:var(--blue);box-shadow:0 0 0 3px var(--blueSoft)}
