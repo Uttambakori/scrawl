@@ -165,34 +165,39 @@ warli: {
     <a class="end-cta" href="../index.html"><span>Open the editor</span><span class="end-arrow" aria-hidden="true">↗</span></a>
     <div class="giant" id="giant" aria-label="Scrawl"></div>
     <footer class="foot">
-      <p>Scrawl draws from the rules of living traditions. Warli comes from the Adivasi communities of Maharashtra, Gond from the Gond and Pardhan Gond people of Madhya Pradesh. If you love the look, buy work from the artists who keep them alive.</p>
+      <p>Scrawl draws from the rules of living art traditions, each one made and kept alive by communities of artists across India. If you love the look, find and buy work from the artists themselves.</p>
       <p class="foot-links"><a href="https://github.com/Uttambakori/scrawl">GitHub</a><a href="../index.html">Editor</a><span>Every drawing on this page was generated live.</span></p>
     </footer>
   </section>
 
 </main>
 
-<!-- the editor's own engine and packs, straight from the repository -->
-<script src="../engine.js"></script>
-<script src="../icons.js"></script>
-<script src="../gens.js"></script>
-<script src="../gens2.js"></script>
-<script src="../gens3.js"></script>
-<script src="../gens4.js"></script>
-<script src="../presets.js"></script>
-<script src="../presets2.js"></script>
-<script src="../presets3.js"></script>
-<script src="../warli.js"></script>
-<script src="../warli-presets.js"></script>
-<script src="../gond.js"></script>
-<script src="../gond-presets.js"></script>
-<script src="../styles.js"></script>
-<script src="../templates.js"></script>
-<script src="../templates2.js"></script>
-<script src="../warli-templates.js"></script>
-<script src="../gond-templates.js"></script>
-<script src="../data.js"></script>
-<script src="render.js"></script>
-<script src="site.js"></script>
+<!-- The editor's own engine and packs, loaded in the same order the
+     editor loads them: the list is read from ../index.html, so a new
+     tradition added to the editor appears here with no change to this
+     page. The fixed list is only a fallback for opening from disk. -->
+<script>
+(function () {
+  var FALLBACK = ['engine.js', 'icons.js', 'gens.js', 'gens2.js', 'gens3.js', 'gens4.js', 'presets.js', 'presets2.js', 'presets3.js',
+    'warli.js', 'warli-presets.js', 'gond.js', 'gond-presets.js', 'styles.js', 'templates.js', 'templates2.js',
+    'warli-templates.js', 'gond-templates.js', 'data.js'];
+  function load(list) {
+    var srcs = list.map(function (s) { return '../' + s; }).concat(['render.js', 'site.js']);
+    (function next(i) {
+      if (i >= srcs.length) return;
+      var s = document.createElement('script');
+      s.src = srcs[i];
+      s.onload = function () { next(i + 1); };
+      s.onerror = function () { console.warn('could not load', srcs[i]); next(i + 1); };
+      document.body.appendChild(s);
+    })(0);
+  }
+  fetch('../index.html').then(function (r) { if (!r.ok) throw 0; return r.text(); }).then(function (html) {
+    var list = [], re = /<script\s+src="([^"]+)"/g, m;
+    while ((m = re.exec(html))) if (!/^(https?:)?\/\//.test(m[1]) && m[1] !== 'app.js') list.push(m[1]);
+    load(list.length ? list : FALLBACK);
+  }).catch(function () { load(FALLBACK); });
+})();
+</script>
 </body>
 </html>

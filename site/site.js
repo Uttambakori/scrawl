@@ -29,10 +29,18 @@
     gond: { bg: '#123A5C', head: '#F2A93B', ink: ['#F5EEDC', '#F2A93B', '#3EA88A'], acc: ['#D6336C', '#F2A93B', '#3EA88A'], pal: 4 },
     sketch: { bg: '#F4FF6B', head: '#FF2D55', ink: ['#101010'], acc: ['#FF2D55', '#101010'], pal: 26 },
   };
+  /* traditions that arrive later only pick a palette and a colour
+     for the type; everything else comes from that palette */
+  const LATER = {
+    madhubani: { pal: 6, head: '#E9B23A' },
+    pattachitra: { pal: 1, head: '#A8281C' },
+    kalamkari: { pal: 3, head: '#D4A13A' },
+  };
   function theme(k) {
     if (THEME[k]) return THEME[k];
-    const p = R.palette(k, 0);
-    return { bg: p.paper, head: p.colors[1], ink: [p.colors[0]], acc: [p.colors[1]], pal: 0 };
+    const o = LATER[k] || {}, n = S.stylePalettes(k).length, pal = (o.pal || 0) < n ? (o.pal || 0) : 0;
+    const p = R.palette(k, pal);
+    return (THEME[k] = { bg: p.paper, head: o.head || p.colors[1], ink: [p.colors[0]], acc: [p.colors[1], p.colors[2]], pal });
   }
   const cols = (k, ink, acc) => { const t = theme(k); return [ink || t.ink[0], acc || t.acc[0], t.acc[1] || t.acc[0], t.ink[0], t.bg]; };
 

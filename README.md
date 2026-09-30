@@ -327,12 +327,13 @@ Nothing runs server-side and nothing leaves the browser.
 
 ## The website
 
-`site/` is Scrawl's marketing page. It has no art assets of its own: it loads
-the editor's engine and packs from the repository root and draws every
-illustration live, so it is always in step with the library. Traditions,
-palettes, piece counts and templates are read from the loaded packs, so a new
-tradition appears on the site once its `<script>` tags are added to both
-`index.html` and `site/index.html`.
+`site/` is Scrawl's marketing page. It has no art assets of its own: it reads
+the list of `<script>` tags from the editor's `index.html`, loads the same
+engine and packs in the same order, and draws every illustration live.
+Traditions, palettes, piece counts and templates all come from the loaded
+packs, so a tradition added to the editor appears on the site with no change
+to `site/`. Optional per-tradition colours for the site live in the `THEME` and
+`LATER` tables at the top of `site/site.js`.
 
 Serve the repository root (for GitHub Pages: deploy from the `main` branch,
 root folder) and open `/site/`. Its "Open the editor" links point at `../index.html`.
