@@ -50,6 +50,11 @@
   /* A mark drawn on top of a filled silhouette is the same colour as the
      silhouette and disappears. Tiger stripes, an elephant's ear, the ribs
      of a mane: all of these are cut back to the ground, not painted on. */
+  /* held hands: a painted bar of `w` box units, not a ruled hairline */
+  const clasp = (h, a, b, w) => {
+    const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1, nx = -dy / l * w / 2, ny = dx / l * w / 2;
+    solid(h, [[a[0] + nx, a[1] + ny], [b[0] + nx, b[1] + ny], [b[0] - nx, b[1] - ny], [a[0] - nx, a[1] - ny]]);
+  };
   const carve = (h, a, b, w) => h.line(a[0], a[1], b[0], b[1], { passes: 1, w: w || 1, role: 'fill' });
 
   /* ============================================================
@@ -93,6 +98,27 @@
     const J = POSES[((pose % POSES.length) + POSES.length) % POSES.length];
     const lw = Math.max(.5, 1.0 * s);
 
+    /* A limb is painted, not ruled: one pull of the stick, thick where
+       it leaves the body and thinning to the hand or foot. It is built
+       as a solid in figure units, so it keeps its weight against the
+       body at any size instead of shrinking to a hairline. Widths are
+       taken at each point; a bend gets a mitred corner. */
+    const limb = (pts, ws) => {
+      const nrm = (a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1; return [-dy / l, dx / l]; };
+      const L = [], R = [];
+      pts.forEach((pt, i) => {
+        const n0 = i > 0 ? nrm(pts[i - 1], pt) : null, n1 = i < pts.length - 1 ? nrm(pt, pts[i + 1]) : null;
+        let n = n0 && n1 ? [n0[0] + n1[0], n0[1] + n1[1]] : (n0 || n1);
+        const l = Math.hypot(n[0], n[1]) || 1; n = [n[0] / l, n[1] / l];
+        const k = n0 && n1 ? 1 / Math.max(.55, n[0] * n1[0] + n[1] * n1[1]) : 1;
+        const hw = ws[i] / 2 * k;
+        L.push(P(pt[0] + n[0] * hw, pt[1] + n[1] * hw));
+        R.unshift(P(pt[0] - n[0] * hw, pt[1] - n[1] * hw));
+      });
+      solid(h, L.concat(R));
+    };
+    const ARM_W = [2.5, 2.1, 1.35], LEG_W = [2.9, 2.35, 1.5];
+
     /* head — sits ON the shoulder line, never floating above it */
     const hd = P(0, HEAD_Y);
     disc(h, hd[0], hd[1], HEAD_R * s / ar, HEAD_R * s);
@@ -103,16 +129,13 @@
     solid(h, [P(0, WAIST_Y), P(HIP, HIP_Y), P(-HIP, HIP_Y)]);
 
     /* limbs bend at a joint — a straight stick reads as furniture */
-    const shL = P(-ARM_X, SHOULDER_Y + .5), shR = P(ARM_X, SHOULDER_Y + .5);
-    const hpL = P(-LEG_X, HIP_Y), hpR = P(LEG_X, HIP_Y);
-    const eL = P(J[0][0], J[0][1]), haL = P(J[1][0], J[1][1]);
-    const eR = P(J[2][0], J[2][1]), haR = P(J[3][0], J[3][1]);
-    const kL = P(J[4][0], J[4][1]), ftL = P(J[5][0], J[5][1]);
-    const kR = P(J[6][0], J[6][1]), ftR = P(J[7][0], J[7][1]);
-    stroke(h, shL, eL, lw); stroke(h, eL, haL, lw);
-    stroke(h, shR, eR, lw); stroke(h, eR, haR, lw);
-    stroke(h, hpL, kL, lw); stroke(h, kL, ftL, lw);
-    stroke(h, hpR, kR, lw); stroke(h, kR, ftR, lw);
+    const shLf = [-ARM_X, SHOULDER_Y + 1.2], shRf = [ARM_X, SHOULDER_Y + 1.2];
+    const hpLf = [-LEG_X, HIP_Y - .6], hpRf = [LEG_X, HIP_Y - .6];
+    limb([shLf, J[0], J[1]], ARM_W); limb([shRf, J[2], J[3]], ARM_W);
+    limb([hpLf, J[4], J[5]], LEG_W); limb([hpRf, J[6], J[7]], LEG_W);
+    const shL = P(...shLf), shR = P(...shRf);
+    const haL = P(J[1][0], J[1][1]), haR = P(J[3][0], J[3][1]);
+    const ftL = P(J[5][0], J[5][1]), ftR = P(J[7][0], J[7][1]);
 
     /* props hang off joints the skeleton already knows */
     switch (o.prop || 0) {
@@ -122,7 +145,7 @@
         stroke(h, P(-8.6, HEAD_Y - 12), P(8.6, HEAD_Y - 12), lw);
         break;
       }
-      case 2: stroke(h, P(J[3][0], J[3][1] - 26), P(J[3][0] + 2, J[3][1] + 24), lw * 1.3); break;
+      case 2: limb([[J[3][0], J[3][1] - 26], [J[3][0] + 1, J[3][1] - 1], [J[3][0] + 2, J[3][1] + 24]], [1.6, 1.6, 1.6]); break;
       case 3: {                                  // dhol, slung at the hip
         const c = P(13, 6);
         blob(h, h.ring(c[0], c[1], 8 * s / ar, 6.5 * s, 12, 0, .02));
@@ -130,7 +153,7 @@
         break;
       }
       case 4: {                                  // the tarpa: gourd and pipe
-        stroke(h, P(6, -14), P(19, -25), lw * 1.2);
+        limb([[6, -14], [12.5, -19.5], [19, -25]], [1.3, 1.6, 2]);
         const g0 = P(23, -28); disc(h, g0[0], g0[1], 4.4 * s / ar, 4.4 * s);
         stroke(h, P(19, -25), P(10, -20), lw * .8);
         break;
@@ -146,7 +169,7 @@
       case 6: solid(h, [P(-9.5, HEAD_Y - 13), P(9.5, HEAD_Y - 13), P(6, HEAD_Y - 4), P(-6, HEAD_Y - 4)]); break;
       case 7: { const c = P(15, 6); fig(h, c[0], c[1], s * .42, 0, { ar }); break; }
       case 8: {
-        stroke(h, haR, P(J[3][0] + 6, J[3][1] - 14), lw);
+        limb([J[3], [J[3][0] + 3, J[3][1] - 7], [J[3][0] + 6, J[3][1] - 14]], [1.5, 1.5, 1.5]);
         solid(h, [P(J[3][0] + 4, J[3][1] - 14), P(J[3][0] + 12, J[3][1] - 18), P(J[3][0] + 9, J[3][1] - 10)]);
         break;
       }
@@ -185,7 +208,7 @@
     for (let i = 0; i < n; i++) {
       made.push(fig(h, 2 + gap * (i + .5), 50, s, pose, { ar, lean: p.alt ? (i % 2 ? 7 : -7) : 0 }));
     }
-    if (p.joined) for (let i = 0; i < n - 1; i++) stroke(h, made[i].hand[1], made[i + 1].hand[0], Math.max(.5, s));
+    if (p.joined) for (let i = 0; i < n - 1; i++) clasp(h, made[i].hand[1], made[i + 1].hand[0], 1.3 * s);
   });
 
   /* ============================================================
@@ -207,7 +230,7 @@
         const t = (i / n) * TAU - Math.PI / 2;
         made.push(fig(h, 50 + Math.cos(t) * R, 50 + Math.sin(t) * R, s, 3));
       }
-      if (p.joined) for (let i = 0; i < n; i++) stroke(h, made[i].hand[1], made[(i + 1) % n].hand[0], Math.max(.4, s));
+      if (p.joined) for (let i = 0; i < n; i++) clasp(h, made[i].hand[1], made[(i + 1) % n].hand[0], 1.3 * s);
     }
     if (p.player) fig(h, 50, 50, Math.min(.30, outer / (p.rings * 2.4 + 2)), 0, { prop: 4 });
   });

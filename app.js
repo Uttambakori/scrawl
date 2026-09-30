@@ -14,6 +14,8 @@
   const pickOf = a => a[Math.floor(Math.random() * a.length)];
   const uid = () => (Date.now() % 1e7) * 1000 + Math.floor(Math.random() * 1000);
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const TYPE = S.TYPE;
+  const PLAN = S.PLAN;
 
   /* ---------------- a generator for hand-drawn custom paths ------------- */
   GENS.custom = {
@@ -25,6 +27,37 @@
       if (pts.length < 2) return;
       if (p.smooth > 40) h.shape(pts, { closed: !!p.closed });
       else h.shape(pts, { closed: !!p.closed, sharp: true });
+    }
+  };
+
+  /* ---------------- plain shapes ----------------
+     Rectangle, ellipse and line, drawn by the same hand as everything
+     else — set Shakiness to 0 in The hand for a crisp, ruled edge. */
+  GENS.prim = {
+    key: 'prim', cat: 'Custom', label: 'Shape', aspect: 'free',
+    params: [{ k: 'kind', label: 'Shape', type: 'opt', options: ['Rectangle', 'Ellipse', 'Line'], def: 0 },
+    { k: 'radius', label: 'Corner radius', type: 'num', min: 0, max: 50, def: 0, step: 1 },
+    { k: 'outline', label: 'Outline', type: 'bool', def: 1 }],
+    draw(h, p) {
+      const ar = p._ar || 1;
+      if (p.kind === 2) {
+        const d = p._dir | 0;
+        const L = d === 2 ? [0, 50, 100, 50] : d === 3 ? [50, 0, 50, 100] : d === 1 ? [0, 100, 100, 0] : [0, 0, 100, 100];
+        h.line(L[0], L[1], L[2], L[3]); return;
+      }
+      const pts = [];
+      if (p.kind === 1) {
+        for (let i = 0; i < 44; i++) { const a = i / 44 * Math.PI * 2; pts.push([50 + Math.cos(a) * 50, 50 + Math.sin(a) * 50]); }
+        h.shape(pts, { closed: true, outline: p.outline !== 0 }); return;
+      }
+      const R = Math.min(50, p.radius || 0);
+      if (!R) { h.shape([[0, 0], [100, 0], [100, 100], [0, 100]], { closed: true, sharp: true, outline: p.outline !== 0 }); return; }
+      // the radius is a share of the short side, so corners stay round when stretched
+      const rx = ar > 1 ? R / ar : R, ry = ar > 1 ? R : R * ar;
+      [[100 - rx, ry, -90], [100 - rx, 100 - ry, 0], [rx, 100 - ry, 90], [rx, ry, 180]].forEach(([cx, cy, a0]) => {
+        for (let i = 0; i <= 5; i++) { const a = (a0 + i * 18) * Math.PI / 180; pts.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]); }
+      });
+      h.shape(pts, { closed: true, outline: p.outline !== 0 });
     }
   };
 
@@ -40,8 +73,10 @@
   const presetByName = (n, style) =>
     (style && PRESETS.find(p => p.name === n && p.style === style)) || PRESETS.find(p => p.name === n);
   function baseWeight(d) { const dd = d || doc; return +(((dd ? dd.w + dd.h : 2160) / 2) / 1080 * 3.2).toFixed(2); }
-  function defaultStyle(d) {
-    const hh = (S.STYLES && S.styleOf(libStyle).hand) || { rough: 1.1, bow: 1, passes: 2, weight: 3.2, fillMode: 'none' };
+  /* The hand belongs to the tradition a piece comes from, not to
+     whichever tradition the library happens to be showing. */
+  function defaultStyle(d, style) {
+    const hh = (S.STYLES && S.styleOf(style || (d && d.style) || libStyle).hand) || { rough: 1.1, bow: 1, passes: 2, weight: 3.2, fillMode: 'none' };
     return {
       stroke: 0, fill: 4, accent: 1,
       weight: +(baseWeight(d) * (hh.weight / 3.2)).toFixed(2),
@@ -141,10 +176,15 @@
   function makeItem(genKey, box, d) {
     const g = GENS[genKey], params = {};
     g.params.forEach(pa => params[pa.k] = pa.def);
-    return { id: uid(), type: 'shape', gen: genKey, params, seed: rint(0, 99999), x: box.x, y: box.y, w: box.w, h: box.h, rot: 0, st: defaultStyle(d), hidden: 0, locked: 0, name: g.label };
+    const st = defaultStyle(d, g.style);
+    /* a tradition can claim a palette slot for a role — Madhubani's
+       `fill` is its third pigment, not the paper */
+    const sl = S.STYLES && S.STYLES[g.style] && S.STYLES[g.style].slots;
+    if (sl) Object.assign(st, sl);
+    return { id: uid(), type: 'shape', gen: genKey, params, seed: rint(0, 99999), x: box.x, y: box.y, w: box.w, h: box.h, rot: 0, st, hidden: 0, locked: 0, name: g.label };
   }
   function makeText(txt, box, d) {
-    return { id: uid(), type: 'text', text: txt || 'Text', font: 'Archivo Black', align: 'middle', letter: 0, lineH: 1.08, caps: 0, fit: 1, size: 80, x: box.x, y: box.y, w: box.w, h: box.h, rot: 0, st: Object.assign(defaultStyle(d), { wobble: 0 }), hidden: 0, locked: 0, name: 'Text' };
+    return { id: uid(), type: 'text', text: txt || 'Text', font: 'Archivo Black', weight: 400, align: 'middle', letter: 0, lineH: 1.08, caps: 0, fit: 1, size: 80, x: box.x, y: box.y, w: box.w, h: box.h, rot: 0, st: Object.assign(defaultStyle(d), { wobble: 0 }), hidden: 0, locked: 0, name: 'Text' };
   }
   function itemFromPreset(pre, box, d, keepSize) {
     const it = makeItem(pre.gen, fitBox(pre.gen, box, d, keepSize), d);
@@ -177,6 +217,29 @@
   let clipN = 0, NS = 's', nsN = 0;
   const col = (c, d) => { const dd = d || doc; return typeof c === 'number' ? (dd.colors[c] || '#000') : c; };
 
+  /* ---------------- type ----------------
+     Weight, style, case and outline live on the text layer. A layer made
+     before weights existed is drawn in the weight its file always used. */
+  const wOf = it => it.weight || TYPE.defaultWeight(it.font);
+  function caseText(it, s) {
+    if (it.caps) return s.toUpperCase();
+    if (it.tcase === 'lower') return s.toLowerCase();
+    if (it.tcase === 'title') return s.toLowerCase().replace(/(^|[\s\-/(“"'])(\S)/g, (m, a, b) => a + b.toUpperCase());
+    return s;
+  }
+  function typeAttrs(it, d) {
+    const fs = it.size, ink = col(it.st.stroke, d);
+    let a = ` font-weight="${wOf(it)}"`;
+    if (it.italic) a += ' font-style="italic"';
+    if (it.deco) a += ` text-decoration="${it.deco}"`;
+    if (it.hollow) a += ` fill="none" stroke="${ink}" stroke-width="${(Math.max(1.5, it.outline || 3) * fs / 100).toFixed(2)}" stroke-linejoin="round"`;
+    else {
+      a += ` fill="${ink}"`;
+      if (it.outline > 0) a += ` stroke="${col(it.outlineC === undefined ? 1 : it.outlineC, d)}" stroke-width="${(it.outline * fs / 100).toFixed(2)}" stroke-linejoin="round" paint-order="stroke"`;
+    }
+    return a + ` style="font-family:'${it.font}',sans-serif"`;
+  }
+
   function itemMarkup(it, d) {
     d = d || doc;
     if (it.hidden) return '';
@@ -204,9 +267,9 @@
       const large = sweep > 180 ? 1 : 0;
       const pid = 'arc' + NS + '_' + it.id;
       const arcD = `M${p0[0].toFixed(2)} ${p0[1].toFixed(2)}A${rr.toFixed(2)} ${rr.toFixed(2)} 0 ${large} ${flip ? 0 : 1} ${p1[0].toFixed(2)} ${p1[1].toFixed(2)}`;
-      const words = esc(it.caps ? String(it.text).toUpperCase() : String(it.text)).replace(/\n/g, ' ');
+      const words = esc(caseText(it, String(it.text))).replace(/\n/g, ' ');
       return `<g data-id="${it.id}" transform="${T}"${filt}${op}><defs><path id="${pid}" d="${arcD}"/></defs>` +
-        `<text font-size="${fs.toFixed(2)}" letter-spacing="${(it.letter * fs / 100).toFixed(2)}" fill="${col(it.st.stroke, d)}" style="font-family:'${it.font}',sans-serif">` +
+        `<text font-size="${fs.toFixed(2)}" letter-spacing="${(it.letter * fs / 100).toFixed(2)}"${typeAttrs(it, d)}>` +
         `<textPath href="#${pid}" startOffset="50%" text-anchor="middle">${words}</textPath></text></g>`;
     }
 
@@ -217,7 +280,7 @@
       const ty = (it._ty || 0);
       const ls = (it.letter * fs / 100).toFixed(2);
       const body = lines.map((l, i) =>
-        `<text x="${ax.toFixed(2)}" y="${(ty + fs * .82 + i * fs * it.lineH).toFixed(2)}" text-anchor="${it.align}" font-size="${fs.toFixed(2)}" letter-spacing="${ls}" fill="${col(it.st.stroke, d)}" style="font-family:'${it.font}',sans-serif">${esc(it.caps ? l.toUpperCase() : l)}</text>`).join('');
+        `<text x="${ax.toFixed(2)}" y="${(ty + fs * .82 + i * fs * it.lineH).toFixed(2)}" text-anchor="${it.align}" font-size="${fs.toFixed(2)}" letter-spacing="${ls}"${typeAttrs(it, d)}>${esc(caseText(it, l))}</text>`).join('');
       return `<g data-id="${it.id}" transform="${T}"${filt}${op}>${body}</g>`;
     }
     if (it.type === 'svg') {
@@ -268,7 +331,8 @@
   /* `crop` limits the output to one board; without it you get every board.
      `viewRect` widens the visible area beyond that, which print needs so the
      crop marks have somewhere to sit. */
-  function buildSVG(d, forExport, crop, viewRect) {
+  function buildSVG(d, forExport, crop, viewRect, opts) {
+    const clear = !!(opts && opts.clear);
     d = migrateBoards(d || doc); clipN = 0; NS = forExport ? 'x' + (++nsN) : 's';
     const tex = texDefs(d);
     const bb = boardsBounds(d);
@@ -276,8 +340,8 @@
       ? { x: crop.x, y: crop.y, w: crop.w, h: crop.h }
       : { x: bb.x, y: bb.y, w: bb.r - bb.x, h: bb.b - bb.y };
     const boards = crop ? [crop] : d.boards;
-    const paper = boards.map(b => `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="${d.paper}"/>`).join('');
-    const grain = tex.rect ? boards.map(b => tex.rect(b)).join('') : '';
+    const paper = clear ? '' : boards.map(b => `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="${d.paper}"/>`).join('');
+    const grain = tex.rect && !clear ? boards.map(b => tex.rect(b)).join('') : '';
     return `<svg xmlns="http://www.w3.org/2000/svg" ${forExport ? '' : 'id="stage" '}width="${Math.round(view.w)}" height="${Math.round(view.h)}" viewBox="${view.x} ${view.y} ${view.w} ${view.h}">
 <defs>${tex.defs}${wobDefs(d)}</defs>
 ${paper}
@@ -289,7 +353,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   let awaitingFonts = false;
   function render() {
     $('#wrap').innerHTML = buildSVG(doc, false);
-    fitTexts(); drawUI(); applyView();
+    fitTexts(); drawUI(); applyView(); watchFonts();
     if (editing) syncEditor();
     $('#zoomLbl').textContent = Math.round(view.z * 100) + '%';
     // a webfont that lands after this render changes the metrics text was
@@ -300,13 +364,24 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     }
   }
 
+  /* Fonts arrive on demand. Anything drawn before its face landed is
+     drawn again once it has, so measurements are taken on the real thing. */
+  let fontWait = null;
+  function watchFonts() {
+    const want = doc.items.filter(i => i.type === 'text' && !i.hidden && !TYPE.isReady(i.font, wOf(i), i.italic, i.text));
+    if (!want.length || fontWait) return;
+    fontWait = Promise.all(want.map(i => TYPE.ready(i.font, wOf(i), i.italic, i.text))).then(() => {
+      fontWait = null; render();
+    });
+  }
+
   function fitTexts() {
     const svg = $('#stage'); if (!svg) return;
     // arc text sizes itself off its box, so neither fit nor tighten apply
     doc.items.filter(i => i.type === 'text' && !i.hidden && !i.arc).forEach(it => {
       // 1. `fit` runs once, when the item is first laid into a slot: pick the
       //    type size that fills it. After that the size is the user's.
-      if (it.fit) {
+      if (it.fit && TYPE.isReady(it.font, wOf(it), it.italic, it.text)) {
         for (let pass = 0; pass < 2; pass++) {
           const g = svg.querySelector(`g[data-id="${it.id}"]`); if (!g) return;
           g.removeAttribute('filter');
@@ -352,6 +427,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     const w = $('#wrap'), bb = boardsBounds();
     w.style.transform = `translate(${view.ox}px,${view.oy}px) scale(${view.z})`;
     w.style.width = (bb.r - bb.x) + 'px'; w.style.height = (bb.b - bb.y) + 'px';
+    drawRulers();
   }
   function fitView() {
     const vp = $('#viewport').getBoundingClientRect(), bb = boardsBounds();
@@ -383,6 +459,8 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       V.push({ v: it.x, it }, { v: it.x + it.w / 2, it }, { v: it.x + it.w, it });
       H.push({ v: it.y, it }, { v: it.y + it.h / 2, it }, { v: it.y + it.h, it });
     });
+    if (prefs.guides) (doc.guides || []).forEach(g => g.x !== undefined ? V.push({ v: g.x }) : H.push({ v: g.y }));
+    if (doc.layout && doc.layout.on) layoutCols(b).forEach(c => V.push({ v: c.x }, { v: c.x + c.w }));
     return { V, H };
   }
 
@@ -416,7 +494,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   function syncChromeColours() { SEL = css('--accent') || SEL; GUIDE = css('--guide') || GUIDE; }
   function drawUI() {
     const ui = $('#ui'); if (!ui) return;
-    const k = 1 / view.z; let s = '';
+    const k = 1 / view.z; let s = studioUnder(k);
 
     guides.forEach(g => {
       if (g.x !== undefined) s += `<line x1="${g.x}" y1="${-4000}" x2="${g.x}" y2="${doc.h + 4000}" stroke="${GUIDE}" stroke-width="${1 * k}"/>`;
@@ -474,7 +552,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       s += `<path d="${d}${pen.hover ? 'L' + pen.hover.x + ' ' + pen.hover.y : ''}" fill="none" stroke="${SEL}" stroke-width="${1.6 * k}" stroke-dasharray="${5 * k} ${4 * k}"/>`;
       pen.pts.forEach((p, i) => s += `<circle cx="${p.x}" cy="${p.y}" r="${(i === 0 ? 6 : 4) * k}" fill="#fff" stroke="${SEL}" stroke-width="${1.6 * k}"/>`);
     }
-    ui.innerHTML = s;
+    ui.innerHTML = s + studioOver(k);
   }
 
   /* box coords (0..w, 0..h) -> document coords; the inverse of localOf */
@@ -518,7 +596,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     const vp = $('#viewport');
     if (drag) { vp.dataset.cursor = drag.mode === 'pan' ? 'grabbing' : drag.mode === 'move' ? 'grabbing' : 'default'; return; }
     if (tool === 'hand' || space) { vp.dataset.cursor = 'grab'; return; }
-    if (tool === 'pen' || tool === 'pencil') { vp.dataset.cursor = 'cross'; return; }
+    if (tool === 'pen' || tool === 'pencil' || tool in SHAPE_TOOLS) { vp.dataset.cursor = 'cross'; return; }
     if (tool === 'text') { vp.dataset.cursor = 'text'; return; }
     if (!e) { vp.dataset.cursor = 'default'; return; }
     const p = toDoc(e);
@@ -530,6 +608,8 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       vp.style.cursor = CURSOR_FOR_HANDLE[(base + turn) % 8];
       vp.dataset.cursor = 'custom'; return;
     }
+    const gi = hitGuide(p);
+    if (gi >= 0) { vp.style.cursor = doc.guides[gi].x !== undefined ? 'ew-resize' : 'ns-resize'; vp.dataset.cursor = 'custom'; return; }
     vp.style.cursor = '';
     vp.dataset.cursor = hitItem(p) ? 'move' : 'default';
   }
@@ -718,6 +798,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     }
 
     if (tool === 'pen') { penClick(p); return; }
+    if (tool in SHAPE_TOOLS) { drag = { mode: 'create', start: p, cur: p }; return; }
     if (tool === 'pencil') { pen = { pts: [p], free: 1 }; drag = { mode: 'draw' }; drawUI(); return; }
     if (tool === 'text') {
       const it = makeText('Text', { x: p.x, y: p.y, w: doc.w * .5, h: doc.h * .09 });
@@ -727,6 +808,10 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     if (editing) { const t = hitItem(p); if (t !== editing) stopEdit(); }
     const hh = hitHandle(p);
     if (hh) { drag = { mode: hh.mode, it: hh.it, hx: hh.hx, hy: hh.hy, start: p, snap: snapshot() }; return; }
+    const gi = hitGuide(p);
+    if (gi >= 0) { drag = { mode: 'guide', g: doc.guides[gi] }; return; }
+    const bl = hitBoardLabel(p);
+    if (bl >= 0) { setActiveBoard(bl); sel.clear(); refreshPanels(); drawUI(); return; }
     const it = hitItem(p);
     if (!it) {
       const bi = boardAt(p);
@@ -763,6 +848,8 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     if (drag.mode === 'pan') { view.ox = drag.ox + (e.clientX - drag.sx); view.oy = drag.oy + (e.clientY - drag.sy); applyView(); return; }
     const p = toDoc(e);
 
+    if (drag.mode === 'create') { drag.cur = constrainCreate(drag.start, p, e.shiftKey); drawUI(); return; }
+    if (drag.mode === 'guide') { moveGuide(drag.g, p, e); return; }
     if (drag.mode === 'draw') {
       const last = pen.pts[pen.pts.length - 1];
       if (Math.hypot(p.x - last.x, p.y - last.y) > 3 / view.z) { pen.pts.push({ x: p.x, y: p.y }); drawUI(); }
@@ -807,7 +894,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       let nw = s.w, nh = s.h, nx = s.x, ny = s.y;
       if (drag.hx === 0) { nw = s.w - lx; nx = s.x + lx; } if (drag.hx === 1) nw = s.w + lx;
       if (drag.hy === 0) { nh = s.h - ly; ny = s.y + ly; } if (drag.hy === 1) nh = s.h + ly;
-      if (e.shiftKey && drag.hx !== .5 && drag.hy !== .5) {
+      if ((e.shiftKey || it.ratio) && drag.hx !== .5 && drag.hy !== .5) {
         const k = Math.max(nw / s.w, nh / s.h); nw = s.w * k; nh = s.h * k;
         if (drag.hx === 0) nx = s.x + s.w - nw; if (drag.hy === 0) ny = s.y + s.h - nh;
       }
@@ -831,10 +918,12 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       if (e.shiftKey) a = Math.round(a / 15) * 15;
       it.rot = Math.round(a * 10) / 10;
     }
-    render();
+    render(); refreshTransform();
   }
 
-  function onUp() {
+  function onUp(e) {
+    if (drag && drag.mode === 'create') { finishCreate(); return; }
+    if (drag && drag.mode === 'guide') { dropGuide(drag.g, e); drag = null; return; }
     if (drag && drag.mode === 'draw') {
       drag = null;
       const raw = pen ? pen.pts : [];
@@ -905,10 +994,11 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       left: (s.x - vp.left) + 'px', top: (s.y - vp.top) + 'px',
       width: (it.w * view.z) + 'px', height: (it.h * view.z) + 'px',
       fontFamily: `'${it.font}', sans-serif`, fontSize: (it.size * view.z) + 'px',
+      fontWeight: wOf(it), fontStyle: it.italic ? 'italic' : 'normal',
       lineHeight: it.lineH, letterSpacing: (it.letter * it.size * view.z / 100) + 'px',
       color: col(it.st.stroke),
       textAlign: it.align === 'start' ? 'left' : it.align === 'end' ? 'right' : 'center',
-      textTransform: it.caps ? 'uppercase' : 'none',
+      textTransform: it.caps ? 'uppercase' : it.tcase === 'lower' ? 'lowercase' : it.tcase === 'title' ? 'capitalize' : 'none',
       transform: `rotate(${it.rot}deg)`, transformOrigin: 'center',
       paddingTop: (it.size * view.z * .06) + 'px',
     });
@@ -923,7 +1013,8 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   /* ---------------- history + files ---------------- */
   const FKEY = 'scrawl.files.v2';
   function store() { try { return JSON.parse(localStorage.getItem(FKEY) || '{"docs":{},"order":[],"cur":null}'); } catch (e) { return { docs: {}, order: [], cur: null }; } }
-  function writeStore(s) { try { localStorage.setItem(FKEY, JSON.stringify(s)); } catch (e) { toast('storage full — use Export › Project file'); } }
+  let storeOK = true;
+  function writeStore(s) { try { localStorage.setItem(FKEY, JSON.stringify(s)); storeOK = true; } catch (e) { storeOK = false; toast('storage full — use Export › Project file'); } }
 
   let saveTimer = null;
   function saveCurrent(now) {
@@ -933,7 +1024,9 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       s.docs[doc.id] = { name: doc.name, updated: Date.now(), doc };
       if (!s.order.includes(doc.id)) s.order.unshift(doc.id);
       s.cur = doc.id; writeStore(s);
+      setSaveState(storeOK ? 'Saved' : 'Not saved');
     };
+    setSaveState('Saving…');
     if (now) write(); else saveTimer = setTimeout(write, 500);
   }
   function commit() {
@@ -959,6 +1052,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   function openDoc(d, resetHistory) {
     stopEdit(); if (doc) saveCurrent(true);
     doc = migrateBoards(d); sel.clear();
+    followDocStyle();
     if (resetHistory !== false) { history = []; hi = -1; }
     buildStylePicker(); buildPalettes(); buildLibrary(); refreshPanels(); render(); fitView(); commit();
     $('#docName').textContent = doc.name;
@@ -966,10 +1060,12 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   }
 
   /* ---------------- templates ---------------- */
+  /* Pure: the gallery builds every tradition's templates for its
+     previews, so this must not touch the library or the open file. */
   function docFromTemplate(tpl) {
-    if (tpl.style && tpl.style !== libStyle) applyStyle(tpl.style);
     const d = newDoc(tpl.w, tpl.h, tpl.pal, tpl.name === 'Blank canvas' ? 'Untitled' : tpl.name);
-    const pals = S.stylePalettes(tpl.style || libStyle);
+    d.style = tpl.style || 'sketch';
+    const pals = S.stylePalettes(d.style);
     const pr = pals[(tpl.pal || 0) % pals.length];
     d.paper = pr[1]; d.colors = [pr[2], pr[3], pr[4], pr[5], pr[1]]; d.palIdx = tpl.pal || 0;
     d.texture = tpl.texture; d.textureAmt = tpl.amt; d.textureScale = 1;
@@ -1217,7 +1313,8 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
           return;
         }
         const b = el('button', 'ctxitem' + (row.danger ? ' danger' : ''));
-        b.innerHTML = `${row.icon ? icon(row.icon, 15) : '<i class="icspace"></i>'}<span>${row.label}</span>${row.key ? `<kbd>${row.key}</kbd>` : ''}`;
+        b.innerHTML = `${row.icon ? icon(row.icon, 15) : '<i class="icspace"></i>'}<span>${row.label}</span>${row.key ? `<kbd>${fmtKey(row.key)}</kbd>` : ''}`;
+        if (row.disabled) b.disabled = true;
         b.onclick = () => { hideMenu(); row.fn(); };
         m.appendChild(b);
       });
@@ -1238,18 +1335,25 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
 
     if (!items.length) {
       showMenu(e.clientX, e.clientY, [
+        [{ label: 'Paste', icon: 'paste', key: 'Ctrl V', fn: () => pasteClip(false), disabled: !readClip() },
+        { label: 'Paste in place', key: 'Ctrl Shift V', fn: () => pasteClip(true), disabled: !readClip() }],
         [{ label: 'Paste SVG code…', icon: 'code', fn: openPasteSVG },
-        { label: 'Place SVG file…', icon: 'upload', fn: () => $('#fileIn').click() }],
+        { label: 'Place image or SVG…', icon: 'upload', key: 'Ctrl O', fn: () => $('#fileIn').click() }],
         [{ label: 'Select all', icon: 'group', key: 'Ctrl A', fn: () => { sel.clear(); doc.items.forEach(i => sel.add(i.id)); render(); refreshPanels(); } },
         { label: 'Surprise me', icon: 'sparkle', fn: () => surprise() }],
-        [{ label: 'Fit to screen', icon: 'fit', key: '0', fn: fitView }],
+        [{ label: 'Fit to screen', icon: 'fit', key: 'Shift 1', fn: fitView },
+        { label: prefs.rulers ? 'Hide rulers' : 'Show rulers', icon: 'ruler', key: 'Shift R', fn: toggleRulers },
+        { label: doc.layout && doc.layout.on ? 'Hide layout grid' : 'Show layout grid', icon: 'layout', key: 'Shift G', fn: toggleLayout }],
       ]);
       return;
     }
     const one = items[0];
     const groups = [
+      [{ label: 'Cut', icon: 'cut', key: 'Ctrl X', fn: cutSel }, { label: 'Copy', icon: 'copy', key: 'Ctrl C', fn: () => copySel() },
+      { label: 'Paste', icon: 'paste', key: 'Ctrl V', fn: () => pasteClip(false), disabled: !readClip() },
+      { label: 'Copy style', key: 'Ctrl Alt C', fn: copyStyle }, { label: 'Paste style', key: 'Ctrl Alt V', fn: pasteStyle, disabled: !styleClip }],
       [{ label: 'Duplicate', icon: 'duplicate', key: 'Ctrl D', fn: duplicateSel },
-      one.g ? { label: 'Ungroup', icon: 'group', key: 'Ctrl ⇧ G', fn: ungroupSel } : { label: 'Group', icon: 'group', key: 'Ctrl G', fn: groupSel },
+      one.g ? { label: 'Ungroup', icon: 'group', key: 'Ctrl Shift G', fn: ungroupSel } : { label: 'Group', icon: 'group', key: 'Ctrl G', fn: groupSel },
       { label: 'Repeat…', icon: 'grid', key: 'Ctrl R', fn: openRepeat },
       { label: one.type === 'text' ? 'Edit text' : 'New hand', icon: one.type === 'text' ? 'type' : 'refresh', key: one.type === 'text' ? '' : 'R', fn: () => one.type === 'text' ? startEdit(one) : (items.forEach(i => i.seed = rint(0, 99999)), commit(), render()) }].concat(one.type === 'text' ? [] : [{ label: 'Edit points', icon: 'pen', fn: () => startNodeEdit(one) }, { label: 'Edit SVG code…', icon: 'code', fn: () => openSVGEditor(one) }]),
       [{ label: 'Stroke', swatches: 1, current: one.st.stroke, pick: v => { items.forEach(i => i.st.stroke = v); commit(); render(); refreshPanels(); } }],
@@ -1280,19 +1384,33 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   function styleCats(k) {
     return [...new Set(PRESETS.filter(p => p.style === k).map(p => p.cat))];
   }
+  /* Switching only changes what comes next — the library, the palette
+     choices, the hand new pieces are drawn with. A piece already on the
+     canvas keeps its colours; only an empty file takes the new ground. */
   function applyStyle(k, opts) {
     libStyle = k; libCat = null;
     const st = S.styleOf(k);
-    if (opts && opts.paint) {
-      const pals = S.stylePalettes(k);
-      const p = pals[0];
-      doc.palIdx = st.palettes ? -1 : 0;
-      doc.paper = p[1];
-      doc.colors = [p[2], p[3], p[4], p[5], p[1]];
-      doc.texture = st.texture; doc.textureAmt = st.textureAmt;
-      commit(); render();
+    if (opts && opts.paint && doc) {
+      doc.style = k;
+      if (!doc.items.length) {
+        const p = S.stylePalettes(k)[0];
+        doc.paper = p[1];
+        doc.colors = [p[2], p[3], p[4], p[5], p[1]];
+        doc.texture = st.texture; doc.textureAmt = st.textureAmt;
+        render();
+      } else toast(`New pieces will be ${st.name} — pick a palette to recolour this one`);
+      doc.palIdx = palIndexOf(doc, k);
+      commit();
     }
     buildPalettes(); buildLibrary(); refreshPanels();
+  }
+  /* which of a tradition's palettes a file is wearing, if any */
+  function palIndexOf(d, k) {
+    return S.stylePalettes(k).findIndex(p => p[1] === d.paper && p[2] === d.colors[0] && p[3] === d.colors[1]);
+  }
+  /* opening a file brings its tradition's library with it */
+  function followDocStyle() {
+    if (doc && doc.style && S.STYLES[doc.style]) { libStyle = doc.style; libCat = null; }
   }
   function buildStylePicker() {
     const sel = $('#styleSel'); if (!sel) return;
@@ -1303,6 +1421,8 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   let thumbN = 0;
   function thumbFor(pre, colors, paper) {
     const h = new Hand(pre.seed, { rough: 1.05, bow: 1, passes: 2, fillMode: 'none', detail: .3 });
+    const sl = S.STYLES && S.styleOf(pre.style).slots;
+    const fillC = sl && sl.fill !== undefined && doc ? doc.colors[sl.fill] : paper;
     if (GENS[pre.gen].cat === 'Patterns') h.clipStart('M0 0H100V100H0Z');
     try { GENS[pre.gen].draw(h, pre.params); } catch (e) { }
     h.clipEnd();
@@ -1310,8 +1430,8 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     h.strokes.forEach(st => {
       let ca = '';
       if (st.clip) { const id = 't' + (thumbN++) + '_' + (n++); clips += `<clipPath id="${id}"><path d="${st.clip}"/></clipPath>`; ca = ` clip-path="url(#${id})"`; }
-      const sc = st.role === 'accent' ? colors[1] : colors[0];
-      const fc = st.fill === 'none' ? 'none' : (st.fill === 'accent' ? colors[1] : st.fill === 'fill' ? paper : colors[0]);
+      const sc = st.role === 'accent' ? colors[1] : st.role === 'fill' ? fillC : colors[0];
+      const fc = st.fill === 'none' ? 'none' : (st.fill === 'accent' ? colors[1] : st.fill === 'fill' ? fillC : colors[0]);
       body += `<path d="${st.d}" fill="${fc}" stroke="${sc}" stroke-width="${(st.w * 1.9).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"${ca}/>`;
     });
     return `<svg viewBox="-8 -8 116 116">${clips ? `<defs>${clips}</defs>` : ''}${body}</svg>`;
@@ -1337,19 +1457,21 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     { const sb = $('#libSearch'); if (sb) sb.placeholder = 'Search ' + mine.length + ' pieces…'; }
     const list = q ? mine.filter(p => p.search.includes(q)) : mine.filter(p => p.cat === libCat);
     host.appendChild(el('div', 'libmeta', q ? `${list.length} match${list.length === 1 ? '' : 'es'}` : `${list.length} in ${libCat}`));
-    if (!q) { const st = S.styleOf(libStyle); if (st.note) host.appendChild(el('p', 'styleNote', st.note)); }
+    if (!q) { const st = S.styleOf(libStyle); if (st.note) { const n = el('p', 'styleNote', st.note); n.onclick = () => n.classList.toggle('full'); host.appendChild(n); } }
 
     const grid = el('div', 'libgrid');
     list.forEach(pre => {
       const cell = el('button', 'libcell');
       cell.style.background = paper;
       cell.innerHTML = thumbFor(pre, colors, paper) + `<span>${pre.name}</span>`;
-      cell.title = pre.name + ' — click to place, right-click for variants';
+      cell.title = pre.name + ' — click or drag to place, right-click for variants';
       cell.onclick = () => {
         const s = Math.min(doc.w, doc.h) * .4;
         addItem(itemFromPreset(pre, { x: 0, y: 0, w: s, h: s }), true);
       };
       cell.oncontextmenu = ev => { ev.preventDefault(); openVariants(pre); };
+      cell.draggable = true;
+      cell.ondragstart = ev => { ev.dataTransfer.setData('text/x-motifs-piece', String(PRESETS.indexOf(pre))); ev.dataTransfer.effectAllowed = 'copy'; };
       grid.appendChild(cell);
     });
     host.appendChild(grid);
@@ -1408,12 +1530,55 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     return body;
   }
 
+  /* A number you can type, arrow, or drag. Typing takes simple sums
+     ("1080/3"), the arrow keys step (Shift for ten), and dragging the
+     label left or right scrubs, the way every design tool does it. */
+  function evalNum(txt) {
+    const t = String(txt).replace(/,/g, '.').replace(/[^0-9+\-*/().\s]/g, '').trim();
+    if (!t) return NaN;
+    try { const v = Function('"use strict";return (' + t + ')')(); return typeof v === 'number' && isFinite(v) ? v : NaN; } catch (e) { return NaN; }
+  }
+  function bindNumeric(inp, grip, get, set, o) {
+    o = o || {};
+    const step = o.step || 1, lim = v => clamp(v, o.min === undefined ? -1e6 : o.min, o.max === undefined ? 1e6 : o.max);
+    const fmt = v => o.fmt ? o.fmt(v) : String(Math.round(v * 100) / 100);
+    const apply = (v, done) => { v = lim(v); set(v); inp.value = fmt(v); if (done) commit(); };
+    inp.onkeydown = e => {
+      e.stopPropagation();
+      if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
+      if (e.key === 'Escape') { inp.value = fmt(get()); inp.blur(); }
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        const cur = evalNum(inp.value);
+        apply((isNaN(cur) ? get() : cur) + (e.key === 'ArrowUp' ? 1 : -1) * step * (e.shiftKey ? 10 : 1), true);
+      }
+    };
+    inp.onfocus = () => setTimeout(() => inp.select(), 0);
+    inp.onchange = () => { const v = evalNum(inp.value); if (isNaN(v)) inp.value = fmt(get()); else apply(v, true); };
+    if (!grip) return;
+    grip.classList.add('scrub');
+    grip.onpointerdown = e => {
+      if (e.button) return;
+      e.preventDefault();
+      const x0 = e.clientX, v0 = get(); let moved = false;
+      grip.setPointerCapture(e.pointerId);
+      grip.onpointermove = ev => {
+        const dx = ev.clientX - x0; if (Math.abs(dx) > 2) moved = true;
+        if (moved) apply(v0 + Math.round(dx / (o.px || 2)) * step * (ev.shiftKey ? 10 : 1));
+      };
+      grip.onpointerup = () => { grip.onpointermove = grip.onpointerup = null; if (moved) commit(); else inp.focus(); };
+    };
+  }
+
   function ctrlNum(label, val, min, max, step, onIn) {
     const w = el('div', 'ctl');
-    w.innerHTML = `<div class="ctop"><span>${label}</span><b>${(+val).toFixed(step < 1 ? 2 : 0)}</b></div><input type="range" min="${min}" max="${max}" step="${step}" value="${val}">`;
-    const i = w.querySelector('input'), b = w.querySelector('b');
-    i.oninput = () => { b.textContent = (+i.value).toFixed(step < 1 ? 2 : 0); onIn(parseFloat(i.value)); };
+    const dp = step < 1 ? 2 : 0;
+    w.innerHTML = `<div class="ctop"><span>${label}</span><input class="numv" type="text" inputmode="decimal" value="${(+val).toFixed(dp)}"></div><input type="range" min="${min}" max="${max}" step="${step}" value="${val}">`;
+    const i = w.querySelector('input[type=range]'), b = w.querySelector('.numv');
+    i.oninput = () => { b.value = (+i.value).toFixed(dp); onIn(parseFloat(i.value)); };
     i.onchange = commit;
+    bindNumeric(b, w.querySelector('.ctop span'), () => parseFloat(i.value), v => { i.value = v; onIn(v); },
+      { min, max, step, fmt: v => (+v).toFixed(dp), px: Math.max(1, 160 / ((max - min) / step)) });
     return w;
   }
   function ctrlSel(label, opts, val, onCh) {
@@ -1428,29 +1593,169 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     w.querySelector('input').onchange = e => { onCh(e.target.checked ? 1 : 0); commit(); };
     return w;
   }
+  const SLOT_NAMES = ['Ink', 'Accent', 'Alt', 'Alt 2', 'Paper'];
+  /* any colour the browser can parse, as #rrggbb */
+  function toHex(c) {
+    if (/^#[0-9a-f]{6}$/i.test(c)) return c.toUpperCase();
+    const cv = toHex.cv || (toHex.cv = document.createElement('canvas').getContext('2d'));
+    cv.fillStyle = '#000'; cv.fillStyle = c;
+    const v = cv.fillStyle;
+    return (v.startsWith('#') ? v : '#000000').toUpperCase();
+  }
+  const normHex = t => { t = String(t).trim().replace(/^#/, ''); if (/^[0-9a-f]{3}$/i.test(t)) t = t.split('').map(c => c + c).join(''); return /^[0-9a-f]{6}$/i.test(t) ? '#' + t.toUpperCase() : null; };
+  async function eyedrop() {
+    if (!window.EyeDropper) { toast('Your browser has no eyedropper — try Chrome or Edge'); return null; }
+    try { const r = await new window.EyeDropper().open(); return r.sRGBHex; } catch (e) { return null; }
+  }
+
+  /* The five file colours first, then the colour itself: a swatch, its
+     hex (type or paste one) and an eyedropper for matching anything on screen. */
   function colorRow(label, cur, onPick) {
     const w = el('div', 'ctl');
-    w.innerHTML = `<div class="ctop"><span>${label}</span></div>`;
+    w.innerHTML = `<div class="ctop"><span>${label}</span><span class="slotname">${typeof cur === 'number' ? SLOT_NAMES[cur] || '' : 'Custom'}</span></div>`;
     const row = el('div', 'crow');
     doc.colors.forEach((c, i) => {
       const s = el('button', 'cdot' + (cur === i ? ' on' : ''));
-      s.style.background = c; s.title = ['Ink', 'Accent', 'Alt', 'Alt 2', 'Paper'][i];
-      s.onclick = () => { onPick(i); commit(); };
+      s.style.background = c; s.title = SLOT_NAMES[i] + ' · ' + toHex(c);
+      s.onclick = () => { onPick(i); commit(); refreshPanels(); };
       row.appendChild(s);
     });
-    const custom = el('input'); custom.type = 'color'; custom.className = 'cpick';
-    custom.value = typeof cur === 'string' ? cur : (doc.colors[cur] || '#000000');
-    custom.oninput = e => onPick(e.target.value); custom.onchange = commit;
-    row.appendChild(custom);
+    const hexf = el('div', 'hexfield');
+    const now = toHex(typeof cur === 'string' ? cur : (doc.colors[cur] || '#000000'));
+    hexf.innerHTML = `<input type="color" class="cpick" value="${now.toLowerCase()}" title="Pick any colour"><input type="text" class="hex" value="${now.slice(1)}" maxlength="7" spellcheck="false" title="Hex colour">`;
+    const [picker, hex] = hexf.querySelectorAll('input');
+    picker.oninput = e => { hex.value = e.target.value.slice(1).toUpperCase(); onPick(e.target.value); };
+    picker.onchange = () => { commit(); refreshPanels(); };
+    hex.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') hex.blur(); };
+    hex.onchange = () => { const h = normHex(hex.value); if (!h) { hex.value = now.slice(1); return; } onPick(h); commit(); refreshPanels(); };
+    hex.onfocus = () => setTimeout(() => hex.select(), 0);
+    const dropper = el('button', 'ico eyedrop'); dropper.innerHTML = icon('dropper', 14); dropper.title = 'Pick a colour from the screen';
+    dropper.onclick = async () => { const h = await eyedrop(); if (h) { onPick(h.toUpperCase()); commit(); render(); refreshPanels(); } };
+    hexf.appendChild(dropper);
+    row.appendChild(hexf);
     w.appendChild(row); return w;
   }
 
-  function refreshPanels() { buildInspector(); buildLayers(); }
+  /* segmented control: one choice from a few, all visible */
+  function seg(opts, cur, onPick, cls) {
+    const w = el('div', 'seg' + (cls ? ' ' + cls : ''));
+    opts.forEach(o => {
+      const b = el('button', o.v === cur ? 'on' : '');
+      b.innerHTML = (o.icon ? icon(o.icon, 15) : o.label) + (o.pro ? PLAN.badge(o.pro) : ''); b.title = o.title || o.label || '';
+      if (o.disabled) b.disabled = true;
+      b.onclick = () => o.pro && !PLAN.can(o.pro) ? PLAN.openUpgrade(o.pro) : onPick(o.v);
+      w.appendChild(b);
+    });
+    return w;
+  }
+
+  let refreshTransform = () => { };
+
+  /* ---------------- the type panel ----------------
+     Everything a designer reaches for when setting a line of type:
+     family, weight, style, size, leading, tracking, alignment, case,
+     decoration, outline, and a path to run it along. */
+  function buildTypeGroup(host, it, items) {
+    const texts = items.filter(i => i.type === 'text');
+    const each = fn => { texts.forEach(fn); render(); };
+    const g = group(host, 'Type', 'text', true);
+
+    const ta = el('textarea', 'copy'); ta.value = it.text; ta.rows = 2; ta.placeholder = 'Type here';
+    ta.onkeydown = e => e.stopPropagation();
+    ta.oninput = e => { it.text = e.target.value; render(); }; ta.onchange = commit;
+    g.appendChild(ta);
+
+    // family: a button that shows the face itself and opens the library
+    const ff = el('button', 'fontfield');
+    ff.innerHTML = `<span style="font-family:'${esc(it.font)}',sans-serif;font-weight:${wOf(it)}">${esc(it.font)}</span>${icon('chevD', 14)}`;
+    ff.title = 'Choose a font (Ctrl ⇧ F)';
+    const before = texts.map(t => [t, t.font, t.weight]);
+    ff.onclick = () => TYPE.openPicker({
+      anchor: ff, current: it.font, style: doc.style || libStyle,
+      sampleText: String(it.text).split('\n')[0].slice(0, 28),
+      onHover: fam => {
+        if (!fam) { before.forEach(([t, f, w]) => { t.font = f; t.weight = w; }); render(); return; }
+        texts.forEach(t => { t.font = fam; t.weight = TYPE.nearestWeight(fam, wOf({ font: before[0][1], weight: before[0][2] })); });
+        render();
+      },
+      onPick: fam => {
+        texts.forEach(t => { t.font = fam; t.weight = TYPE.nearestWeight(fam, wOf({ font: before[0][1], weight: before[0][2] })); if (!TYPE.hasItalic(fam)) t.italic = 0; });
+        commit(); render(); refreshPanels();
+      },
+    });
+    g.appendChild(ff);
+    openFontPicker = () => ff.click();
+
+    // weight + italic
+    const wr = el('div', 'row wrow');
+    const ws = TYPE.weightsOf(it.font), wSel = el('select');
+    wSel.innerHTML = ws.map(v => `<option value="${v}"${v === TYPE.nearestWeight(it.font, wOf(it)) ? ' selected' : ''}>${TYPE.WNAMES[v] || v} · ${v}</option>`).join('');
+    wSel.disabled = ws.length < 2; wSel.title = ws.length < 2 ? 'This family comes in one weight' : 'Weight';
+    wSel.onchange = e => { each(t => { t.weight = TYPE.nearestWeight(t.font, +e.target.value); }); commit(); };
+    wr.appendChild(wSel);
+    const hasIt = TYPE.hasItalic(it.font) || !TYPE.byName[it.font];
+    wr.appendChild(seg([{ v: 1, icon: 'italic', title: hasIt ? 'Italic (Ctrl I)' : 'No italic in this family', disabled: !hasIt }], it.italic ? 1 : 0,
+      () => { const v = it.italic ? 0 : 1; each(t => { t.italic = v; }); commit(); refreshPanels(); }, 'mini'));
+    g.appendChild(wr);
+
+    // size, leading, tracking: numbers, because type is set in numbers
+    const nums = el('div', 'typenums');
+    const numF = (lbl, title, get, set, o) => {
+      const f = el('div', 'field'); f.title = title;
+      f.innerHTML = `<label>${lbl}</label><input type="text" inputmode="decimal">`;
+      const inp = f.querySelector('input'); inp.value = o.fmt(get());
+      bindNumeric(inp, f.querySelector('label'), get, v => { each(t => set(t, v)); }, o);
+      nums.appendChild(f);
+    };
+    numF(icon('fontSize', 14), 'Size', () => it.size, (t, v) => { t.size = v; t.fit = 0; }, { min: 1, max: 6000, step: 1, fmt: v => String(Math.round(v * 10) / 10) });
+    numF(icon('leading', 14), 'Line height', () => it.lineH, (t, v) => { t.lineH = v; }, { min: .5, max: 4, step: .01, px: 4, fmt: v => (+v).toFixed(2) });
+    numF(icon('tracking', 14), 'Letter spacing (% of size)', () => it.letter, (t, v) => { t.letter = v; }, { min: -20, max: 100, step: .5, px: 3, fmt: v => String(Math.round(v * 10) / 10) });
+    g.appendChild(nums);
+
+    const row2 = el('div', 'segrow');
+    row2.appendChild(seg([
+      { v: 'start', icon: 'tAlignL', title: 'Align left' }, { v: 'middle', icon: 'tAlignC', title: 'Centre' }, { v: 'end', icon: 'tAlignR', title: 'Align right' }],
+      it.align, v => { each(t => { t.align = v; }); commit(); refreshPanels(); }));
+    const caseNow = it.caps ? 'upper' : (it.tcase || 'none');
+    row2.appendChild(seg([
+      { v: 'none', label: 'Aa', title: 'As typed' }, { v: 'upper', label: 'AA', title: 'Uppercase' },
+      { v: 'lower', label: 'aa', title: 'Lowercase' }, { v: 'title', label: 'Tt', title: 'Title Case' }],
+      caseNow, v => { each(t => { t.caps = v === 'upper' ? 1 : 0; t.tcase = v === 'upper' ? 'none' : v; }); commit(); refreshPanels(); }));
+    g.appendChild(row2);
+    const row3 = el('div', 'segrow');
+    row3.appendChild(seg([
+      { v: 'underline', icon: 'underline', title: 'Underline (Ctrl U)' }, { v: 'line-through', icon: 'strike', title: 'Strikethrough' }],
+      it.deco || '', v => { each(t => { t.deco = t.deco === v ? '' : v; }); commit(); refreshPanels(); }));
+    row3.appendChild(seg([{ v: 1, icon: 'hollow', title: 'Outline only' }], it.hollow ? 1 : 0,
+      () => { const v = it.hollow ? 0 : 1; each(t => { t.hollow = v; }); commit(); refreshPanels(); }));
+    row3.appendChild(seg([{ v: 1, icon: 'arc', title: 'Set on a curve' }], it.arc ? 1 : 0, () => {
+      const v = it.arc ? 0 : 1;
+      it.arc = v;
+      if (v) { it.fit = 0; const s = Math.max(it.w, it.h, it.size * 4); it.w = s; it.h = s; it._tx = 0; it._ty = 0; }
+      commit(); render(); refreshPanels();
+    }));
+    const ed = el('button', 'ghost editbtn', `${icon('type', 14)}<span>Edit</span>`); ed.title = 'Edit on the canvas (Enter)';
+    ed.onclick = () => startEdit(it);
+    row3.appendChild(ed);
+    g.appendChild(row3);
+    if (it.arc) {
+      g.appendChild(ctrlNum('Arc sweep', it.arcSweep || 180, 20, 350, 5, v => { it.arcSweep = v; render(); }));
+      g.appendChild(ctrlBool('Read along the bottom', it.arcFlip ? 1 : 0, v => { it.arcFlip = v; render(); }));
+    }
+    if (!it.hollow) {
+      g.appendChild(ctrlNum('Outline', it.outline || 0, 0, 20, .5, v => { each(t => { t.outline = v; }); }));
+      if (it.outline > 0) g.appendChild(colorRow('Outline colour', it.outlineC === undefined ? 1 : it.outlineC, v => { each(t => { t.outlineC = v; }); }));
+    } else g.appendChild(ctrlNum('Line width', it.outline || 3, .5, 20, .5, v => { each(t => { t.outline = v; }); }));
+  }
+  let openFontPicker = null;
+
+  function refreshPanels() { buildInspector(); buildLayers(); updateStatus(); }
 
   function buildInspector() {
     const host = $('#insp'); host.innerHTML = '';
     const items = doc.items.filter(i => sel.has(i.id));
 
+    refreshTransform = () => { };
     if (!items.length) {
       const gB = group(host, 'Artboards', 'boards', true);
       doc.boards.forEach((b, i) => {
@@ -1490,6 +1795,22 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       swap.onclick = () => { const t = doc.w; doc.w = doc.h; doc.h = t; syncActiveBoard(); commit(); render(); fitView(); refreshPanels(); };
       g1.appendChild(swap);
 
+      const gL = group(host, 'Layout grid & guides', 'layout', false);
+      const L = layoutOf();
+      gL.appendChild(ctrlBool('Show column grid', L.on, v => { L.on = v; drawUI(); refreshPanels(); }));
+      if (L.on) {
+        gL.appendChild(ctrlNum('Columns', L.cols, 1, 24, 1, v => { L.cols = v; drawUI(); }));
+        gL.appendChild(ctrlNum('Gutter', L.gutter, 0, 200, 1, v => { L.gutter = v; drawUI(); }));
+        gL.appendChild(ctrlNum('Margin', L.margin, 0, 400, 1, v => { L.margin = v; drawUI(); }));
+      }
+      const ng = (doc.guides || []).length;
+      const gr = el('div', 'row');
+      const cg = el('button', 'ghost', ng ? `Clear ${ng} guide${ng > 1 ? 's' : ''}` : 'No guides yet'); cg.disabled = !ng;
+      cg.onclick = () => { clearGuides(); refreshPanels(); };
+      const tr = el('button', 'ghost', prefs.rulers ? 'Hide rulers' : 'Show rulers'); tr.onclick = () => { toggleRulers(); refreshPanels(); };
+      gr.append(cg, tr); gL.appendChild(gr);
+      gL.appendChild(el('p', 'hint small', 'Drag from a ruler to add a guide; drag it back to remove it.'));
+
       const g2 = group(host, 'Paper', 'paper', true);
       const pc = el('input'); pc.type = 'color'; pc.value = doc.paper; pc.className = 'cpick wide';
       pc.oninput = e => { doc.paper = e.target.value; doc.colors[4] = e.target.value; render(); }; pc.onchange = commit;
@@ -1508,62 +1829,84 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     }
 
     const it = items[0];
-    host.appendChild(el('div', 'selname', esc(items.length > 1 ? items.length + ' items selected' : it.name)));
+    /* the name is a field: renaming a layer is one click, not a hunt */
+    const kindIcon = it.type === 'text' ? 'type' : it.type === 'svg' ? 'image' : it.type === 'path' ? 'pen' : 'shapes';
+    const head = el('div', 'selname');
+    if (items.length > 1) head.innerHTML = `${icon('layers', 15)}<span>${items.length} layers selected</span>`;
+    else {
+      head.innerHTML = `${icon(kindIcon, 15)}<input type="text" spellcheck="false" title="Rename layer">`;
+      const nm = head.querySelector('input');
+      nm.value = it.type === 'text' && it.name === 'Text' ? String(it.text).split('\n')[0].slice(0, 40) : it.name;
+      nm.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter' || e.key === 'Escape') nm.blur(); };
+      nm.onchange = () => { it.name = nm.value.trim() || it.name; commit(); buildLayers(); };
+    }
+    host.appendChild(head);
 
-    /* --- position & size --- */
-    const gT = group(host, 'Position & size', 'transform', true);
-    const tf = el('div', 'grid4');
-    [['X', 'x'], ['Y', 'y'], ['W', 'w'], ['H', 'h']].forEach(([lbl, k]) => {
-      const f = el('div', 'field');
-      f.innerHTML = `<label>${lbl}</label><input type="number" value="${Math.round(it[k])}">`;
-      f.querySelector('input').onchange = e => { items.forEach(i => i[k] = parseFloat(e.target.value)); if (it.type === 'text') items.forEach(i => i.fit = 1); commit(); render(); };
-      tf.appendChild(f);
+    /* --- alignment: to the board for one layer, to each other for several --- */
+    const ar = el('div', 'alignrow');
+    const one = items.length < 2;
+    [['alignL', 'l'], ['alignCH', 'cx'], ['alignR', 'r'], ['alignT', 't'], ['alignCV', 'cy'], ['alignB', 'b']].forEach(([id, m]) => {
+      const a = byId[id], b = el('button', 'ico');
+      b.innerHTML = icon(a.icon, 16); b.title = `${a.label}${one ? ' of board' : ''} — ${a.key}`;
+      b.onclick = () => { alignSel(m); refreshTransform(); }; ar.appendChild(b);
     });
+    ar.appendChild(el('i', 'arsep'));
+    [['distH', 'h'], ['distV', 'v']].forEach(([id, m]) => {
+      const a = byId[id], b = el('button', 'ico');
+      b.innerHTML = icon(a.icon, 16); b.title = `${a.label} — ${a.key}`;
+      b.disabled = items.length < 3; b.onclick = () => { distributeSel(m); refreshTransform(); }; ar.appendChild(b);
+    });
+    host.appendChild(ar);
+
+    /* --- position & size, measured from the board's corner --- */
+    const gT = group(host, 'Position & size', 'transform', true);
+    const bo = board() || { x: 0, y: 0 };
+    const tf = el('div', 'tfgrid');
+    const field = (lbl, k, get, set) => {
+      const f = el('div', 'field');
+      f.innerHTML = `<label>${lbl}</label><input type="text" inputmode="decimal" value="${Math.round(get(it) * 10) / 10}">`;
+      const inp = f.querySelector('input');
+      bindNumeric(inp, f.querySelector('label'), () => get(it), v => {
+        items.forEach(i => set(i, v));
+        if (it.type === 'text' && (k === 'w' || k === 'h')) items.forEach(i => { i.fit = 1; });
+        render(); refreshTransform();
+      }, { step: 1 });
+      tf.appendChild(f); return inp;
+    };
+    const fx = field('X', 'x', i => i.x - bo.x, (i, v) => { i.x = v + bo.x; });
+    const fy = field('Y', 'y', i => i.y - bo.y, (i, v) => { i.y = v + bo.y; });
+    const fr = field(icon('refresh', 12), 'rot', i => i.rot, (i, v) => { i.rot = ((v + 180) % 360 + 360) % 360 - 180; });
+    fr.parentElement.title = 'Rotation in degrees';
+    const fw = field('W', 'w', i => i.w, (i, v) => { v = Math.max(1, v); if (i.ratio) i.h = i.h * v / i.w; i.w = v; });
+    const fh = field('H', 'h', i => i.h, (i, v) => { v = Math.max(1, v); if (i.ratio) i.w = i.w * v / i.h; i.h = v; });
+    const lk = el('button', 'ico lockratio' + (it.ratio ? ' on' : ''));
+    lk.innerHTML = icon(it.ratio ? 'link' : 'unlink', 14);
+    lk.title = it.ratio ? 'Proportions locked' : 'Lock proportions';
+    lk.onclick = () => { const v = !it.ratio; items.forEach(i => { i.ratio = v ? 1 : 0; }); commit(); refreshPanels(); };
+    tf.appendChild(lk);
     gT.appendChild(tf);
-    gT.appendChild(ctrlNum('Rotation', it.rot, -180, 180, 1, v => { items.forEach(i => i.rot = v); render(); }));
+    /* keep the fields honest while something is dragged on the canvas */
+    refreshTransform = () => {
+      [[fx, i => i.x - bo.x], [fy, i => i.y - bo.y], [fw, i => i.w], [fh, i => i.h], [fr, i => i.rot]].forEach(([f, g]) => {
+        if (document.activeElement !== f) f.value = Math.round(g(it) * 10) / 10;
+      });
+    };
     /* what you most often do to the selected thing, one click away */
     const qa = el('div', 'btnrow');
-    const q = (label, title, fn) => { const b = el('button', 'ghost', label); b.title = title; b.onclick = () => { fn(); commit(); render(); refreshPanels(); }; qa.appendChild(b); };
-    q('Flip ↔', 'Mirror horizontally', () => items.forEach(i => { i.flipX = !i.flipX; }));
-    q('Flip ↕', 'Mirror vertically', () => items.forEach(i => { i.flipY = !i.flipY; }));
+    const q = (ic, title, fn) => { const b = el('button', 'ghost ico'); b.innerHTML = icon(ic, 15); b.title = title; b.onclick = () => { fn(); commit(); render(); refreshPanels(); }; qa.appendChild(b); };
+    q('flipH', 'Flip horizontal (Shift H)', () => items.forEach(i => { i.flipX = !i.flipX; }));
+    q('flipV', 'Flip vertical (Shift V)', () => items.forEach(i => { i.flipY = !i.flipY; }));
     const b0 = board() || { x: 0, y: 0, w: doc.w, h: doc.h };
-    q('↔ Board', 'Stretch across the board', () => items.forEach(i => { i.x = b0.x + b0.w * .03; i.w = b0.w * .94; }));
-    q('↕ Board', 'Stretch down the board', () => items.forEach(i => { i.y = b0.y + b0.h * .03; i.h = b0.h * .94; }));
-    gT.appendChild(qa);
-    const ord = el('div', 'btnrow');
-    [['front', 'Bring to front'], ['up', 'Forward'], ['down', 'Backward'], ['back', 'Send to back']].forEach(([d, t]) => {
-      const b = el('button', 'ghost'); b.title = t; b.dataset.icon = d + ':15'; b.onclick = () => orderSel(d); ord.appendChild(b);
+    q('stretchH', 'Stretch across the board', () => items.forEach(i => { i.x = b0.x + b0.w * .03; i.w = b0.w * .94; }));
+    q('stretchV', 'Stretch down the board', () => items.forEach(i => { i.y = b0.y + b0.h * .03; i.h = b0.h * .94; }));
+    [['front', 'Bring to front (Shift ])'], ['up', 'Forward (])'], ['down', 'Backward ([)'], ['back', 'Send to back (Shift [)']].forEach(([d, t]) => {
+      const b = el('button', 'ghost ico'); b.title = t; b.innerHTML = icon(d, 15); b.onclick = () => orderSel(d); qa.appendChild(b);
     });
-    gT.appendChild(ord);
+    gT.appendChild(qa);
 
     /* --- content --- */
-    if (it.type === 'text') {
-      const g = group(host, 'Text', 'text', true);
-      const ed = el('button', 'wide solid', 'Edit on canvas');
-      ed.onclick = () => startEdit(it); g.appendChild(ed);
-      const ta = el('textarea'); ta.value = it.text; ta.rows = 2;
-      ta.oninput = e => { it.text = e.target.value; render(); }; ta.onchange = commit;
-      g.appendChild(ta);
-      const fs = el('select', 'wide');
-      fs.innerHTML = FONTS.map(f => `<option${f[0] === it.font ? ' selected' : ''}>${f[0]}</option>`).join('');
-      fs.onchange = e => { it.font = e.target.value; render(); commit(); };
-      g.appendChild(fs);
-      const maxSize = Math.max(400, Math.round(Math.min(doc.w, doc.h) * .8));
-      g.appendChild(ctrlNum('Size', Math.round(it.size), 6, maxSize, 1, v => { items.forEach(i => { if (i.type === 'text') i.size = v; }); render(); }));
-      g.appendChild(ctrlBool('Curve onto an arc', it.arc ? 1 : 0, v => {
-        it.arc = v;
-        if (v) { it.fit = 0; const s = Math.max(it.w, it.h, it.size * 4); it.w = s; it.h = s; it._tx = 0; it._ty = 0; }
-        render(); refreshPanels();
-      }));
-      if (it.arc) {
-        g.appendChild(ctrlNum('Arc sweep', it.arcSweep || 180, 20, 350, 5, v => { it.arcSweep = v; render(); }));
-        g.appendChild(ctrlBool('Read along the bottom', it.arcFlip ? 1 : 0, v => { it.arcFlip = v; render(); }));
-      }
-      g.appendChild(ctrlSel('Align', ['Left', 'Centre', 'Right'], ['start', 'middle', 'end'].indexOf(it.align), v => { it.align = ['start', 'middle', 'end'][v]; render(); }));
-      g.appendChild(ctrlNum('Letter spacing %', it.letter, -12, 45, .5, v => { it.letter = v; render(); }));
-      g.appendChild(ctrlNum('Line height', it.lineH, .7, 2.2, .05, v => { it.lineH = v; render(); }));
-      g.appendChild(ctrlBool('Uppercase', it.caps, v => { it.caps = v; render(); }));
-    } else if (it.type === 'shape') {
+    if (it.type === 'text') buildTypeGroup(host, it, items);
+    else if (it.type === 'shape') {
       const g = group(host, 'Shape', 'shape', true);
       GENS[it.gen].params.forEach(pa => {
         if (pa.k.startsWith('_')) return;
@@ -1585,6 +1928,11 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
         g.appendChild(colorRow('Fill', it.st.fill, v => { items.forEach(i => i.st.fill = v); render(); }));
         g.appendChild(colorRow('Accent', it.st.accent, v => { items.forEach(i => i.st.accent = v); render(); }));
       }
+      g.appendChild(ctrlNum('Opacity', it.st.opacity, .05, 1, .05, v => { items.forEach(i => i.st.opacity = v); render(); }));
+    }
+
+    if (it.type === 'svg') {
+      const g = group(host, 'Appearance', 'appear', true);
       g.appendChild(ctrlNum('Opacity', it.st.opacity, .05, 1, .05, v => { items.forEach(i => i.st.opacity = v); render(); }));
     }
 
@@ -1611,14 +1959,15 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       const row = el('div', 'layer' + (sel.has(it.id) ? ' on' : ''));
       row.draggable = true;
       row.dataset.id = it.id;
-      const label = it.type === 'text' ? String(it.text).split('\n')[0].slice(0, 20) || 'Text' : it.name;
+      const label = it.type === 'text' && (!it.name || it.name === 'Text') ? String(it.text).split('\n')[0].slice(0, 28) || 'Text' : it.name;
+      if (it.g) row.classList.add('ing');
       const kind = it.type === 'text' ? 'type' : it.type === 'svg' ? 'image' : it.type === 'path' ? 'pen' : 'shapes';
       row.innerHTML = `<i class="lgrip" title="Drag to reorder">${icon('more', 13)}</i>
         <i class="lkind">${icon(kind, 14)}</i><span>${esc(label)}</span>
         <button class="lbtn eye" title="Show / hide">${icon(it.hidden ? 'eyeOff' : 'eye', 14)}</button>
         <button class="lbtn lock${it.locked ? ' on' : ''}" title="Lock">${icon(it.locked ? 'lock' : 'unlock', 14)}</button>`;
       row.querySelector('span').onclick = e => { if (!e.shiftKey) sel.clear(); withGroup(it).forEach(f => sel.add(f.id)); render(); refreshPanels(); };
-      row.querySelector('span').ondblclick = () => { if (it.type === 'text') startEdit(it); };
+      row.querySelector('span').ondblclick = e => renameLayer(it, e.target);
       row.querySelector('.eye').onclick = e => { e.stopPropagation(); it.hidden = it.hidden ? 0 : 1; commit(); render(); refreshPanels(); };
       row.querySelector('.lock').onclick = e => { e.stopPropagation(); it.locked = it.locked ? 0 : 1; commit(); refreshPanels(); };
       row.ondragstart = e => { dragLayer = it.id; row.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; };
@@ -1651,7 +2000,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       s.onclick = () => applyPalette(i);
       host.appendChild(s);
     });
-    buildBrandBar();
+    buildBrandBar(); buildDocColors();
   }
   function applyPalette(i) {
     const pal = S.stylePalettes(libStyle)[i];
@@ -1683,6 +2032,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
 
   /* ---------------- clipboard ---------------- */
   async function copyAsSVG() {
+    if (!PLAN.can('vector')) return PLAN.openUpgrade('vector');
     stopEdit();
     const items = doc.items.filter(i => sel.has(i.id));
     const svg = await exportSVG(items.length ? items : null);
@@ -1710,6 +2060,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   function setBrand(b) { try { b ? localStorage.setItem(BKEY, JSON.stringify(b)) : localStorage.removeItem(BKEY); } catch (e) { } buildPalettes(); }
 
   function saveBrand() {
+    if (!PLAN.can('brandKit')) return PLAN.openUpgrade('brandKit');
     const heads = doc.items.filter(i => i.type === 'text');
     const b = {
       paper: doc.paper, colors: doc.colors.slice(),
@@ -1788,6 +2139,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     doc.w = cv[1]; doc.h = cv[2]; syncActiveBoard();
     if (onBrand) { doc.palIdx = -1; doc.paper = bk.paper; doc.colors = bk.colors.slice(); }
     else { doc.palIdx = palIdx; doc.paper = p.paper; doc.colors = p.colors.slice(); }
+    doc.style = libStyle;
     const stx = S.styleOf(libStyle);
     doc.texture = stx.texture || pickOf(TEXTURES);
     doc.textureAmt = stx.textureAmt || +rnd(.04, .2).toFixed(2);
@@ -1840,7 +2192,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       Object.assign(it.st, hand);
       it.st.fillMode = Math.random() > .6 ? fillMode : 'none';
       it.st.fillGap = +rnd(2.5, 9).toFixed(1); it.st.fillAngle = rint(-80, 80);
-      it.st.stroke = 0; it.st.accent = Math.random() > .3 ? 1 : 2; it.st.fill = Math.random() > .65 ? 1 : 4;
+      it.st.stroke = 0; it.st.accent = Math.random() > .3 ? 1 : 2; it.st.fill = (S.styleOf(pre.style).slots || {}).fill ?? (Math.random() > .65 ? 1 : 4);
       it.rot = Math.random() > .75 ? +rnd(-10, 10).toFixed(1) : 0;
       if (sl.frame) { it.rot = 0; it.st.fillMode = 'none'; }
       if (sl.pattern) { it.st.opacity = +rnd(.14, .42).toFixed(2); it.st.stroke = 3; it.st.fillMode = 'none'; it.rot = 0; }
@@ -1854,6 +2206,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
      MODAL + HOME
      ========================================================== */
   function modal(title, build, actions) {
+    $('#modal').classList.remove('wide');
     $('#modalTitle').textContent = title;
     const body = $('#modalBody'); body.innerHTML = '';
     build(body);
@@ -1862,9 +2215,10 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     $('#modal').classList.add('on');
     paintIcons($('#modal'));
   }
-  function closeModal() { $('#modal').classList.remove('on'); }
+  function closeModal() { $('#modal').classList.remove('on', 'wide'); }
 
   function docPreview(d) {
+    d.items.forEach(i => { if (i.type === 'text') TYPE.request(i.font, i.italic); });
     const box = el('div', 'tplprev');
     box.innerHTML = buildSVG(d, true);
     const sv = box.querySelector('svg');
@@ -1873,7 +2227,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     return box;
   }
 
-  let homeTab = 'files', tplCat = 'All';
+  let homeTab = 'files', tplCat = 'All', tplStyle = 'all';
   function openHome(tab) {
     homeTab = tab || homeTab;
     saveCurrent(true);
@@ -1891,23 +2245,46 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     const filterHost = $('#homeFilters'); filterHost.innerHTML = '';
     if (homeTab === 'templates') {
       $('#homeTitle').textContent = 'Start from a template';
-      const myCats = ['All', ...new Set(TEMPLATES.filter(t => (t.style || 'sketch') === libStyle).map(t => t.cat || 'Print'))];
+      /* Every tradition's templates, grouped under their tradition.
+         One row of chips picks the tradition, the next the kind. */
+      const styleOfTpl = t => t.style || 'sketch';
+      const styles = Object.keys(S.STYLES).filter(k => TEMPLATES.some(t => styleOfTpl(t) === k));
+      if (tplStyle !== 'all' && !styles.includes(tplStyle)) tplStyle = 'all';
+      const row = () => { const r = el('div', 'chiprow'); filterHost.appendChild(r); return r; };
+      const styleRow = row();
+      ['all', ...styles].forEach(k => {
+        const n = TEMPLATES.filter(t => k === 'all' || styleOfTpl(t) === k).length;
+        const b = el('button', 'chip' + (k === tplStyle ? ' on' : ''), `${k === 'all' ? 'All traditions' : S.STYLES[k].name} <em>${n}</em>`);
+        b.onclick = () => { tplStyle = k; renderHome(); };
+        styleRow.appendChild(b);
+      });
+      const inStyle = TEMPLATES.filter(t => tplStyle === 'all' || styleOfTpl(t) === tplStyle);
+      const styleNames = Object.values(S.STYLES).map(st => st.name);
+      const myCats = ['All', ...new Set(inStyle.map(t => t.cat || 'Print').filter(c => !styleNames.includes(c)))];
       if (!myCats.includes(tplCat)) tplCat = 'All';
-      myCats.forEach(c => {
+      const catRow = row();
+      if (myCats.length > 2) myCats.forEach(c => {
         const b = el('button', 'chip' + (c === tplCat ? ' on' : ''), c);
         b.onclick = () => { tplCat = c; renderHome(); };
-        filterHost.appendChild(b);
+        catRow.appendChild(b);
       });
-      TEMPLATES
-        .filter(t => (t.style || 'sketch') === libStyle)
+      const shown = inStyle
         .filter(t => tplCat === 'All' || (t.cat || 'Print') === tplCat)
-        .filter(t => !q || t.name.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q))
-        .forEach(tpl => {
-        const card = el('button', 'filecard');
-        card.appendChild(docPreview(docFromTemplate(tpl)));
-        card.appendChild(el('div', 'fileinfo', `<b>${esc(tpl.name)}</b><span>${esc(tpl.desc)}</span>`));
-        card.onclick = () => openDoc(docFromTemplate(tpl));
-        grid.appendChild(card);
+        .filter(t => !q || t.name.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q));
+      if (!shown.length) { grid.appendChild(el('p', 'hint', 'No template matches that.')); return; }
+      /* the tradition you are working in comes first */
+      [libStyle, ...styles.filter(k => k !== libStyle)].forEach(k => {
+        const group = shown.filter(t => styleOfTpl(t) === k);
+        if (!group.length) return;
+        const st = S.STYLES[k];
+        grid.appendChild(el('h3', 'tplgroup', `${esc(st.name)} <span>${esc(st.where)} · ${group.length}</span>`));
+        group.forEach(tpl => {
+          const card = el('button', 'filecard');
+          card.appendChild(docPreview(docFromTemplate(tpl)));
+          card.appendChild(el('div', 'fileinfo', `<b>${esc(tpl.name)}</b><span>${esc(tpl.desc)}</span>`));
+          card.onclick = () => openDoc(docFromTemplate(tpl));
+          grid.appendChild(card);
+        });
       });
       return;
     }
@@ -1945,19 +2322,32 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     });
   }
 
+  const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  /* "Ctrl Shift Z" reads as ⌘⇧Z on a Mac and Ctrl+Shift+Z elsewhere */
+  function fmtKey(k) {
+    if (!k) return '';
+    const parts = k.split(' ');
+    if (isMac) return parts.map(p => ({ Ctrl: '⌘', Shift: '⇧', Alt: '⌥', Del: '⌫', Enter: '↩' })[p] || p).join('');
+    return parts.map(p => ({ Del: 'Delete' })[p] || p).join('+');
+  }
   function openShortcuts() {
-    modal('Keyboard', body => {
-      const rows = [['V', 'Select'], ['H', 'Pan'], ['T', 'Text'], ['P', 'Pen — draw your own'],
-      ['Double-click', 'Edit text on the canvas'], ['Right-click', 'Context menu'],
-      ['Space + drag', 'Pan'], ['Scroll', 'Zoom'], ['0', 'Fit to screen'],
-      ['Ctrl/⌘ Z', 'Undo'], ['Ctrl/⌘ ⇧ Z', 'Redo'], ['Ctrl/⌘ D', 'Duplicate'], ['Ctrl/⌘ A', 'Select all'],
-      ['Delete', 'Delete'], ['R', 'Reroll the hand'], ['[ / ]', 'Backward / forward'],
-      ['Arrows', 'Nudge (⇧ for 10×)'], ['Alt + drag', 'Duplicate as you drag'],
-      ['⇧ + resize', 'Keep proportions'], ['Ctrl/⌘ + drag', 'Ignore snapping']];
-      const t = el('div', 'keys');
-      rows.forEach(([k, v]) => t.innerHTML += `<kbd>${k}</kbd><span>${v}</span>`);
-      body.appendChild(t);
+    modal('Keyboard shortcuts', body => {
+      const cols = el('div', 'keycols');
+      const block = (title, rows) => {
+        const b = el('div', 'keyblock');
+        b.appendChild(el('h4', '', title));
+        const t = el('div', 'keys');
+        rows.forEach(([k, v]) => t.innerHTML += `<kbd>${esc(k)}</kbd><span>${esc(v)}</span>`);
+        b.appendChild(t); cols.appendChild(b);
+      };
+      block('Tools', ACTIONS.filter(a => a.tool).map(a => [fmtKey(a.key), a.label]).concat([[fmtKey('T'), 'Text']]));
+      ['File', 'Edit', 'Object', 'Type', 'View'].forEach(m => block(m, ACTIONS.filter(a => a.menu === m && a.key).map(a => [fmtKey(a.key), a.label])));
+      block('Canvas', [['Space + drag', 'Pan'], ['Scroll', 'Zoom'], ['0', 'Fit to screen'], ['Arrows', 'Nudge 1 (⇧ for 10)'],
+        ['Double-click', 'Edit text or points'], ['Alt + drag', 'Duplicate as you drag'], ['⇧ + resize', 'Keep proportions'],
+        [isMac ? '⌘ + drag' : 'Ctrl + drag', 'Ignore snapping'], ['Drag a ruler', 'Add a guide'], ['Right-click', 'Context menu'], [fmtKey('Ctrl K'), 'Search every command']]);
+      body.appendChild(cols);
     });
+    $('#modal').classList.add('wide');
   }
 
   /* the SVG behind any element, editable */
@@ -2016,12 +2406,16 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   const toast = m => { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('on'), 1700); };
 
   let fontCache = {};
-  async function inlineFonts(fams) {
-    const key = fams.slice().sort().join(',');
+  /* every face the text layers use, so an export embeds exactly those */
+  const fontUses = list => list.filter(i => i.type === 'text').map(i => ({ family: i.font, weight: wOf(i), italic: i.italic }));
+  async function inlineFonts(uses) {
+    const spec = TYPE.cssQuery(uses);
+    const key = spec;
     if (fontCache[key] !== undefined) return fontCache[key];
     try {
-      const spec = fams.map(f => 'family=' + (FONTS.find(x => x[0] === f) || [, 'DM+Sans'])[1]).join('&');
-      let css = await (await fetch(`https://fonts.googleapis.com/css2?${spec}&display=swap`)).text();
+      const res = await fetch(`https://fonts.googleapis.com/css2?${spec}&display=swap`);
+      if (!res.ok) throw new Error(res.status);
+      let css = await res.text();
       const urls = [...new Set([...css.matchAll(/url\((https:\/\/[^)]+)\)/g)].map(m => m[1]))];
       for (const u of urls) {
         const blob = await (await fetch(u)).blob();
@@ -2033,20 +2427,20 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   }
   /* Pass a subset to export just those layers, cropped to their bounds — that's
      what "copy as SVG" needs so it pastes at a sane size elsewhere. */
-  async function exportSVG(subset) {
+  async function exportSVG(subset, opts) {
     const list = subset && subset.length ? subset : doc.items;
-    const fams = [...new Set(list.filter(i => i.type === 'text').map(i => i.font))];
+    const fams = fontUses(list);
     let svg;
     if (subset && subset.length) {
       const b = selBounds(list), pad = 2;
       const view = { x: b.x - pad, y: b.y - pad, w: (b.r - b.x) + pad * 2, h: (b.b - b.y) + pad * 2 };
       const sub = Object.assign({}, doc, { items: list, texture: 'none' });
-      const inner = buildSVG(sub, true);
+      const inner = buildSVG(sub, true, null, null, opts);
       const body = inner.slice(inner.indexOf('<defs>'), inner.lastIndexOf('</svg>'))
         .replace(/<rect width="\d+" height="\d+" fill="[^"]*"\/>/, '');
       svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(view.w)}" height="${Math.round(view.h)}" viewBox="${view.x.toFixed(1)} ${view.y.toFixed(1)} ${view.w.toFixed(1)} ${view.h.toFixed(1)}">${body}</svg>`;
     } else {
-      svg = buildSVG(doc, true, board());
+      svg = buildSVG(doc, true, board(), null, opts);
     }
     if (fams.length) { const css = await inlineFonts(fams); if (css) svg = svg.replace('<defs>', `<defs><style>${css}</style>`); }
     return svg;
@@ -2095,7 +2489,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       const mw = Math.max(.4, Math.min(b.w, b.h) * .0012);
       svg = svg.replace('</svg>', cropMarks(b, markLen, markOff, mw) + '</svg>');
     }
-    const fams = [...new Set(doc.items.filter(i => i.type === 'text').map(i => i.font))];
+    const fams = fontUses(doc.items);
     if (fams.length) { const css = await inlineFonts(fams); if (css) svg = svg.replace('<defs>', `<defs><style>${css}</style>`); }
     return { svg, viewRect };
   }
@@ -2174,6 +2568,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   }
 
   function openPrint() {
+    if (!PLAN.can('print')) return PLAN.openUpgrade('print');
     const b = board();
     const o = { bleed: Math.round(Math.min(b.w, b.h) * .02), marks: 1, dpi: 300, format: 'pdf' };
     modal('Print setup', body => {
@@ -2204,23 +2599,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     });
   }
 
-  function openExportMenu() {
-    const r = $('#btnExport').getBoundingClientRect();
-    showMenu(r.right - 240, r.bottom + 6, [[
-      { label: 'PNG · 2× (recommended)', icon: 'image', fn: () => doExport('png2') },
-      { label: 'PNG · 4× for print', icon: 'image', fn: () => doExport('png4') },
-      { label: 'PNG · actual size', icon: 'image', fn: () => doExport('png1') },
-    ], [
-      { label: 'SVG · vector, editable', icon: 'code', fn: () => doExport('svg') },
-    ], [
-      { label: 'Print — bleed & crop marks…', icon: 'frame', fn: openPrint },
-    ], [
-      { label: 'Copy as SVG', icon: 'copy', key: 'Ctrl ⇧ C', fn: copyAsSVG },
-    ], [
-      { label: 'Project file · .json', icon: 'file', fn: () => doExport('json') },
-    ]]);
-  }
-
+  function openExportMenu() { openExport(); }
   function placeSVGText(text, name) {
     try {
       const parsed = new DOMParser().parseFromString(text, 'image/svg+xml');
@@ -2240,6 +2619,907 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       toast('placed');
       return true;
     } catch (e) { toast('could not read that SVG'); return false; }
+  }
+
+  /* ==========================================================
+     STUDIO — the desktop layer: rulers and guides, layout grids,
+     plain shapes, clipboard, images, export, menus and shortcuts.
+     ========================================================== */
+  const PKEY = 'scrawl.prefs';
+  const prefs = (() => { try { return Object.assign({ rulers: 1, guides: 1 }, JSON.parse(localStorage.getItem(PKEY) || '{}')); } catch (e) { return { rulers: 1, guides: 1 }; } })();
+  function savePrefs() { try { localStorage.setItem(PKEY, JSON.stringify(prefs)); } catch (e) { } }
+  const SHAPE_TOOLS = { rect: 0, ellipse: 1, line: 2 };
+  const RULER = 20;
+  const selItems = () => doc.items.filter(i => sel.has(i.id));
+
+  /* ---------------- drawing a plain shape ---------------- */
+  function constrainCreate(a, p, square) {
+    if (!square) return p;
+    const dx = p.x - a.x, dy = p.y - a.y;
+    if (tool === 'line') {
+      const ang = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4), len = Math.hypot(dx, dy);
+      return { x: a.x + Math.cos(ang) * len, y: a.y + Math.sin(ang) * len };
+    }
+    const m = Math.max(Math.abs(dx), Math.abs(dy));
+    return { x: a.x + Math.sign(dx || 1) * m, y: a.y + Math.sign(dy || 1) * m };
+  }
+  function createBox(a, b) {
+    return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) };
+  }
+  function finishCreate() {
+    const a = drag.start, b = drag.cur, kind = SHAPE_TOOLS[tool];
+    drag = null;
+    let box = createBox(a, b);
+    // a click without a drag still makes something, at a sensible size
+    if (box.w < 4 && box.h < 4) {
+      const s = Math.min(doc.w, doc.h) * .25;
+      box = kind === 2 ? { x: a.x, y: a.y, w: s, h: 0 } : { x: a.x - s / 2, y: a.y - s / 2, w: s, h: s };
+      b.x = a.x + box.w; b.y = a.y;
+    }
+    const it = makeItem('prim', { x: 0, y: 0, w: 1, h: 1 });
+    it.params = { kind, radius: 0, outline: 1 };
+    it.name = ['Rectangle', 'Ellipse', 'Line'][kind];
+    if (kind === 2) {
+      const flatX = box.w < 6, flatY = box.h < 6;
+      it.params._dir = flatY ? 2 : flatX ? 3 : ((b.x - a.x) * (b.y - a.y) < 0 ? 1 : 0);
+      if (flatY) { box.y -= 4; box.h = 8; } if (flatX) { box.x -= 4; box.w = 8; }
+    } else { it.st.fillMode = 'solid'; it.st.fill = 1; }
+    Object.assign(it, box);
+    addItem(it);
+    setTool('select');
+  }
+
+  /* ---------------- guides ---------------- */
+  function hitGuide(p) {
+    if (!prefs.guides || !doc.guides || tool !== 'select') return -1;
+    const tol = 4 / view.z;
+    for (let i = doc.guides.length - 1; i >= 0; i--) {
+      const g = doc.guides[i];
+      if (g.x !== undefined ? Math.abs(p.x - g.x) < tol : Math.abs(p.y - g.y) < tol) return i;
+    }
+    return -1;
+  }
+  function moveGuide(g, p, e) {
+    const ax = g.x !== undefined ? 'x' : 'y';
+    let v = p[ax];
+    if (snapOn && !(e && (e.ctrlKey || e.metaKey))) {
+      const b = board(), tol = 6 / view.z;
+      const cands = ax === 'x' ? [b.x, b.x + b.w / 2, b.x + b.w] : [b.y, b.y + b.h / 2, b.y + b.h];
+      doc.items.forEach(it => { if (!it.hidden) cands.push(...(ax === 'x' ? [it.x, it.x + it.w / 2, it.x + it.w] : [it.y, it.y + it.h / 2, it.y + it.h])); });
+      let best = tol; cands.forEach(c => { if (Math.abs(c - v) < best) { best = Math.abs(c - v); v = c; } });
+    }
+    g[ax] = Math.round(v * 10) / 10;
+    drawUI(); drawRulers(); updateStatus(p, g);
+  }
+  /* letting go of a guide over its ruler, or off the canvas, deletes it */
+  function dropGuide(g, e) {
+    const r = $('#viewport').getBoundingClientRect();
+    const cx = e ? e.clientX - r.left : 99, cy = e ? e.clientY - r.top : 99;
+    const off = g.x !== undefined ? (cx < RULER || cx > r.width) : (cy < RULER || cy > r.height);
+    if (off && prefs.rulers) { doc.guides = doc.guides.filter(x => x !== g); toast('Guide removed'); }
+    commit(); drawUI(); updateStatus();
+  }
+  function clearGuides() { if (!doc.guides || !doc.guides.length) { toast('No guides to clear'); return; } doc.guides = []; commit(); drawUI(); toast('Guides cleared'); }
+
+  /* ---------------- layout grid ---------------- */
+  const layoutOf = () => doc.layout || (doc.layout = { on: 0, cols: 12, gutter: 24, margin: 64 });
+  function layoutCols(b) {
+    const L = layoutOf(), n = Math.max(1, L.cols | 0);
+    const cw = (b.w - L.margin * 2 - L.gutter * (n - 1)) / n;
+    const out = [];
+    for (let i = 0; i < n; i++) out.push({ x: b.x + L.margin + i * (cw + L.gutter), w: cw });
+    return out;
+  }
+
+  /* ---------------- canvas chrome, under and over the selection ---------------- */
+  function boardLabel(b, i) {
+    return { x: b.x, y: b.y - 8 / view.z, w: (String(b.name).length * 6.6 + 64) / view.z, h: 20 / view.z, i };
+  }
+  function hitBoardLabel(p) {
+    if (doc.boards.length < 2) return -1;
+    for (let i = 0; i < doc.boards.length; i++) {
+      const L = boardLabel(doc.boards[i], i);
+      if (p.x >= L.x && p.x <= L.x + L.w && p.y <= L.y + 4 / view.z && p.y >= L.y - L.h) return i;
+    }
+    return -1;
+  }
+  function studioUnder(k) {
+    let s = '';
+    if (doc.layout && doc.layout.on) doc.boards.forEach(b => {
+      layoutCols(b).forEach(c => { s += `<rect x="${c.x}" y="${b.y}" width="${Math.max(0, c.w)}" height="${b.h}" fill="${css('--colfill') || 'rgba(224,53,88,.08)'}"/>`; });
+    });
+    if (prefs.guides && doc.guides && doc.guides.length) {
+      const G2 = css('--guide2') || '#E0359A', far = 1e5;
+      doc.guides.forEach(g => {
+        s += g.x !== undefined
+          ? `<line x1="${g.x}" y1="${-far}" x2="${g.x}" y2="${far}" stroke="${G2}" stroke-width="${k}"/>`
+          : `<line x1="${-far}" y1="${g.y}" x2="${far}" y2="${g.y}" stroke="${G2}" stroke-width="${k}"/>`;
+      });
+    }
+    if (doc.boards.length > 1) doc.boards.forEach((b, i) => {
+      const L = boardLabel(b, i), on = i === doc.active;
+      s += `<text x="${b.x}" y="${L.y}" font-size="${11 * k}" style="font-family:'DM Sans',sans-serif;font-weight:${on ? 600 : 500}" fill="${on ? SEL : (css('--dim') || '#888')}">${esc(b.name)}<tspan fill="${css('--dim') || '#888'}" font-weight="400" dx="${6 * k}">${b.w} × ${b.h}</tspan></text>`;
+    });
+    return s;
+  }
+  function studioOver(k) {
+    if (!drag || drag.mode !== 'create') return '';
+    const a = drag.start, b = drag.cur;
+    const dash = `stroke="${SEL}" stroke-width="${1.4 * k}" fill="${SEL}14" stroke-dasharray="${4 * k} ${3 * k}"`;
+    if (tool === 'line') return `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" ${dash}/>`;
+    const r = createBox(a, b);
+    const tag = tool === 'ellipse'
+      ? `<ellipse cx="${r.x + r.w / 2}" cy="${r.y + r.h / 2}" rx="${r.w / 2}" ry="${r.h / 2}" ${dash}/>`
+      : `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" ${dash}/>`;
+    return tag + `<text x="${r.x + r.w / 2}" y="${r.y + r.h + 18 * k}" font-size="${11 * k}" text-anchor="middle" fill="${SEL}" style="font-family:'DM Mono',monospace">${Math.round(r.w)} × ${Math.round(r.h)}</text>`;
+  }
+
+  /* ---------------- rulers ----------------
+     Measured from the active board's corner, the way print designers
+     read them. The selection's extent shows as a band on both. */
+  function drawRulers() {
+    document.body.classList.toggle('rulers', !!prefs.rulers);
+    if (!prefs.rulers || !doc) return;
+    const vp = $('#viewport'), W = vp.clientWidth, H = vp.clientHeight, dpr = devicePixelRatio || 1;
+    const b = board(), bb = boardsBounds(), z = view.z;
+    const toS = (v, ax) => ax === 'x' ? view.ox + (v - bb.x) * z : view.oy + (v - bb.y) * z;
+    const steps = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000];
+    const major = steps.find(s => s * z >= 64) || 10000;
+    const minor = major / (major * z >= 110 ? 10 : 5);
+    const panel = css('--panel'), line = css('--line'), dim = css('--dim'), soft = css('--accentSoft');
+    const items = selItems();
+    const sb = items.length ? selBounds(items) : null;
+    [['#rulerX', W - RULER, RULER, 'x'], ['#rulerY', RULER, H - RULER, 'y']].forEach(([id, w, h, ax]) => {
+      const c = $(id); if (!c) return;
+      if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) {
+        c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); c.style.width = w + 'px'; c.style.height = h + 'px';
+      }
+      const g = c.getContext('2d');
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      g.fillStyle = panel; g.fillRect(0, 0, w, h);
+      const len = ax === 'x' ? w : h, org = ax === 'x' ? b.x : b.y;
+      const at = v => toS(v, ax) - RULER;
+      if (sb) {
+        const a0 = at(ax === 'x' ? sb.x : sb.y), a1 = at(ax === 'x' ? sb.r : sb.b);
+        g.fillStyle = soft;
+        ax === 'x' ? g.fillRect(a0, 0, a1 - a0, h) : g.fillRect(0, a0, w, a1 - a0);
+      }
+      const v0 = org + Math.floor(((ax === 'x' ? view.ox : view.oy) * -1 / z + (ax === 'x' ? bb.x : bb.y) - org) / minor) * minor;
+      g.strokeStyle = dim; g.fillStyle = dim; g.lineWidth = 1;
+      g.font = "9.5px 'DM Mono', monospace";
+      g.beginPath();
+      for (let v = v0 - minor; ; v += minor) {
+        const sp = Math.round(at(v)) + .5; if (sp > len + 2) break; if (sp < -2) continue;
+        const rel = Math.round((v - org) * 1000) / 1000, isMajor = Math.abs(rel / major - Math.round(rel / major)) < 1e-6;
+        const t = isMajor ? RULER : (Math.abs(rel / (major / 2) - Math.round(rel / (major / 2))) < 1e-6 ? 7 : 4);
+        if (ax === 'x') { g.moveTo(sp, h); g.lineTo(sp, h - t); } else { g.moveTo(w, sp); g.lineTo(w - t, sp); }
+        if (isMajor) {
+          if (ax === 'x') g.fillText(String(Math.round(rel)), sp + 3, 9);
+          else { g.save(); g.translate(9, sp - 3); g.rotate(-Math.PI / 2); g.fillText(String(Math.round(rel)), 0, 0); g.restore(); }
+        }
+      }
+      g.globalAlpha = .55; g.stroke(); g.globalAlpha = 1;
+      // guides show on the ruler too, so you can find them when zoomed in
+      if (prefs.guides) (doc.guides || []).forEach(gd => {
+        const v = ax === 'x' ? gd.x : gd.y; if (v === undefined) return;
+        const sp = Math.round(at(v)) + .5;
+        g.fillStyle = css('--guide2') || '#E0359A';
+        ax === 'x' ? g.fillRect(sp - 1, 0, 2, h) : g.fillRect(0, sp - 1, w, 2);
+      });
+      g.fillStyle = line; ax === 'x' ? g.fillRect(0, h - 1, w, 1) : g.fillRect(w - 1, 0, 1, h);
+    });
+  }
+  function bindRulers() {
+    [['#rulerX', 'y'], ['#rulerY', 'x']].forEach(([id, ax]) => {
+      const c = $(id); if (!c) return;
+      c.title = 'Drag out a guide';
+      c.addEventListener('pointerdown', e => {
+        if (e.button) return;
+        e.preventDefault(); hideMenu();
+        c.setPointerCapture(e.pointerId);
+        if (!doc.guides) doc.guides = [];
+        if (!prefs.guides) { prefs.guides = 1; savePrefs(); }
+        const g = { [ax]: Math.round(toDoc(e)[ax]) };
+        doc.guides.push(g);
+        c.onpointermove = ev => moveGuide(g, toDoc(ev), ev);
+        c.onpointerup = ev => { c.onpointermove = c.onpointerup = null; dropGuide(g, ev); };
+        drawUI();
+      });
+    });
+    const corner = $('#rulerCorner');
+    if (corner) { corner.title = 'Hide rulers (Shift R)'; corner.onclick = () => toggleRulers(); }
+  }
+  function toggleRulers() { prefs.rulers = prefs.rulers ? 0 : 1; savePrefs(); drawRulers(); toast(prefs.rulers ? 'Rulers on' : 'Rulers off'); }
+  function toggleGuides() { prefs.guides = prefs.guides ? 0 : 1; savePrefs(); drawUI(); drawRulers(); toast(prefs.guides ? 'Guides shown' : 'Guides hidden'); }
+  function toggleStatus() { prefs.status = prefs.status ? 0 : 1; savePrefs(); document.body.classList.toggle('showstatus', !!prefs.status); updateStatus(); }
+  function toggleLayout() { const L = layoutOf(); L.on = L.on ? 0 : 1; commit(); drawUI(); refreshPanels(); toast(L.on ? `Layout grid · ${L.cols} columns` : 'Layout grid off'); }
+
+  /* ---------------- zoom ---------------- */
+  function zoomAt(nz, mx, my) {
+    const r = $('#viewport').getBoundingClientRect();
+    if (mx === undefined) { mx = r.width / 2; my = r.height / 2; }
+    nz = clamp(nz, .03, 10);
+    view.ox = mx - (mx - view.ox) * (nz / view.z); view.oy = my - (my - view.oy) * (nz / view.z);
+    view.z = nz; applyView(); drawUI();
+    $('#zoomLbl').textContent = Math.round(view.z * 100) + '%';
+  }
+  /* frame a rectangle of the document in the viewport */
+  function zoomToRect(R, pad) {
+    const vp = $('#viewport').getBoundingClientRect(), bb = boardsBounds();
+    const top = prefs.rulers ? RULER : 0;
+    pad = pad || 80;
+    view.z = clamp(Math.min((vp.width - top - pad * 2) / Math.max(1, R.w), (vp.height - top - pad * 2 - 40) / Math.max(1, R.h)), .03, 10);
+    view.ox = top + (vp.width - top - R.w * view.z) / 2 - (R.x - bb.x) * view.z;
+    view.oy = top + (vp.height - top - 40 - R.h * view.z) / 2 - (R.y - bb.y) * view.z;
+    applyView(); drawUI();
+    $('#zoomLbl').textContent = Math.round(view.z * 100) + '%';
+  }
+  function zoomToSel() {
+    const items = selItems();
+    if (!items.length) { const b = board(); zoomToRect(b); return; }
+    const b = selBounds(items); zoomToRect({ x: b.x, y: b.y, w: b.r - b.x, h: b.b - b.y }, 120);
+  }
+  function zoomMenu() {
+    const top = $('#zoomTop'), below = !!(top && top.offsetParent);
+    const r = (below ? top : $('#zoomLbl')).getBoundingClientRect();
+    const Z = (label, key, fn) => ({ label, key, fn });
+    showMenu(r.left - 60, r.top - 8 - 330, [[
+      Z('Zoom in', 'Ctrl +', () => zoomAt(view.z * 1.25)), Z('Zoom out', 'Ctrl −', () => zoomAt(view.z / 1.25))],
+    [Z('50%', '', () => zoomAt(.5)), Z('100%', '⇧ 0', () => zoomAt(1)), Z('200%', '', () => zoomAt(2))],
+    [Z('Fit everything', '⇧ 1', fitView), Z('Zoom to selection', '⇧ 2', zoomToSel), Z('Zoom to board', '⇧ 3', () => zoomToRect(board()))]]);
+    const m = $('#ctxmenu'), mr = m.getBoundingClientRect();
+    if (below) { m.style.top = (r.bottom + 6) + 'px'; m.style.left = Math.min(innerWidth - mr.width - 8, r.right - mr.width) + 'px'; }
+    else m.style.top = Math.max(8, r.top - mr.height - 10) + 'px';
+  }
+
+  /* ---------------- status & save state ---------------- */
+  let lastPt = null;
+  function updateStatus(p, guide) {
+    const st = $('#status'); if (!st || !doc) return;
+    if (p) lastPt = p;
+    const b = board(), items = selItems();
+    let h = `<span>${esc(b.name)} <b>${b.w} × ${b.h}</b></span>`;
+    if (items.length) {
+      const sb = selBounds(items);
+      h += `<span>${items.length > 1 ? items.length + ' layers' : 'Selection'} <b>${Math.round(sb.r - sb.x)} × ${Math.round(sb.b - sb.y)}</b></span>`;
+    }
+    if (guide) h += `<span>Guide <b>${Math.round((guide.x !== undefined ? guide.x - b.x : guide.y - b.y))}</b></span>`;
+    else if (lastPt) h += `<span class="stpos">X <b>${Math.round(lastPt.x - b.x)}</b> Y <b>${Math.round(lastPt.y - b.y)}</b></span>`;
+    st.innerHTML = h;
+    // stack the readouts when a narrow canvas would slide them under the dock
+    st.classList.remove('stack');
+    const dk = $('.dock');
+    if (dk && st.getBoundingClientRect().right > dk.getBoundingClientRect().left - 8) st.classList.add('stack');
+  }
+  function setSaveState(t) {
+    const n = $('#saveState'); if (!n) return;
+    n.textContent = t; n.dataset.state = t === 'Saved' ? 'ok' : t === 'Saving…' ? 'busy' : 'bad';
+    n.title = t === 'Saved' ? 'Saved in this browser' : t;
+  }
+
+  /* ---------------- file colours ----------------
+     The five colours this file is drawn in, each one editable, so a
+     brand's exact hex values can be set without hunting for a palette. */
+  function setSlot(i, v) {
+    doc.colors[i] = v; if (i === 4) doc.paper = v; doc.palIdx = -1;
+  }
+  function buildDocColors() {
+    let host = $('#docColors');
+    if (!host) {
+      const pb = $('.palbox'); if (!pb) return;
+      host = el('div', 'doccolors'); host.id = 'docColors';
+      pb.parentNode.insertBefore(host, pb);
+    }
+    host.innerHTML = '';
+    syncPalName();
+    const head = el('div', 'dchead', '<span>File colours</span>');
+    const inv = el('button', 'ico'); inv.innerHTML = icon('refresh', 14); inv.title = 'Swap ink and paper';
+    inv.onclick = () => { const t = doc.colors[0]; doc.colors[0] = doc.paper; setSlot(4, t); commit(); render(); buildPalettes(); buildLibrary(); refreshPanels(); };
+    head.appendChild(inv);
+    host.appendChild(head);
+    const row = el('div', 'dcrow');
+    doc.colors.forEach((c, i) => {
+      const lab = el('label', 'dcsw');
+      const hex = toHex(c);
+      lab.title = `${SLOT_NAMES[i]} · ${hex} — click to change`;
+      lab.innerHTML = `<i style="background:${c}"></i><input type="color" value="${hex.toLowerCase()}"><span>${SLOT_NAMES[i]}</span>`;
+      const inp = lab.querySelector('input');
+      inp.oninput = e => { setSlot(i, e.target.value.toUpperCase()); lab.querySelector('i').style.background = e.target.value; render(); };
+      inp.onchange = () => { commit(); buildPalettes(); buildLibrary(); refreshPanels(); };
+      row.appendChild(lab);
+    });
+    host.appendChild(row);
+  }
+
+  /* ---------------- layers: rename in place ---------------- */
+  function renameLayer(it, span) {
+    const inp = el('input', 'lrename'); inp.type = 'text'; inp.value = span.textContent;
+    span.replaceWith(inp); inp.focus(); inp.select();
+    const done = ok => { inp.onblur = null; if (ok && inp.value.trim()) { it.name = inp.value.trim(); commit(); } buildLayers(); buildInspector(); };
+    inp.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') done(true); if (e.key === 'Escape') done(false); };
+    inp.onblur = () => done(true);
+    inp.onclick = e => e.stopPropagation();
+  }
+
+  /* ---------------- clipboard ----------------
+     Copy keeps layers in this browser, so they paste into any file. The
+     system clipboard gets a marker, so a paste can tell whether the last
+     thing copied was ours, an image, an SVG or a line of text. */
+  const CLIPKEY = 'scrawl.clip';
+  let clipMem = null, clipShift = { t: 0, n: 0 };
+  function readClip() { try { return JSON.parse(localStorage.getItem(CLIPKEY) || 'null') || clipMem; } catch (e) { return clipMem; } }
+  function copySel(quiet) {
+    const items = selItems(); if (!items.length) { if (!quiet) toast('Select something to copy'); return false; }
+    const data = { t: Date.now(), doc: doc.id, colors: doc.colors.slice(), items: JSON.parse(JSON.stringify(items)) };
+    clipMem = data;
+    try { localStorage.setItem(CLIPKEY, JSON.stringify(data)); } catch (e) { }
+    try { navigator.clipboard.writeText('scrawl:' + data.t).catch(() => { }); } catch (e) { }
+    if (!quiet) toast(`Copied ${items.length} layer${items.length > 1 ? 's' : ''}`);
+    return true;
+  }
+  function cutSel() { const n = sel.size; if (copySel(true)) { deleteSel(); toast(`Cut ${n} layer${n > 1 ? 's' : ''}`); } }
+  function pasteClip(inPlace) {
+    const data = readClip();
+    if (!data || !data.items || !data.items.length) { toast('Nothing to paste'); return; }
+    const remap = {};
+    const add = data.items.map(src => {
+      const c = JSON.parse(JSON.stringify(src)); c.id = uid(); delete c._edit;
+      if (c.g) { remap[c.g] = remap[c.g] || 'g' + uid(); c.g = remap[c.g]; }
+      // another file has other colours in its slots: keep the look
+      if (data.doc !== doc.id) {
+        ['stroke', 'fill', 'accent'].forEach(k => { if (typeof c.st[k] === 'number') c.st[k] = data.colors[c.st[k]] || c.st[k]; });
+        if (typeof c.outlineC === 'number') c.outlineC = data.colors[c.outlineC];
+      }
+      return c;
+    });
+    if (!inPlace) {
+      const b = selBounds(add);
+      if (data.doc === doc.id) {
+        clipShift = clipShift.t === data.t ? { t: data.t, n: clipShift.n + 1 } : { t: data.t, n: 1 };
+        add.forEach(c => { c.x += 20 * clipShift.n; c.y += 20 * clipShift.n; });
+      } else {
+        const vp = $('#viewport').getBoundingClientRect(), bb = boardsBounds();
+        const cx = (vp.width / 2 - view.ox) / view.z + bb.x, cy = (vp.height / 2 - view.oy) / view.z + bb.y;
+        const dx = cx - (b.x + b.r) / 2, dy = cy - (b.y + b.b) / 2;
+        add.forEach(c => { c.x += dx; c.y += dy; });
+      }
+    }
+    doc.items.push(...add); sel.clear(); add.forEach(a => sel.add(a.id));
+    commit(); render(); refreshPanels();
+    toast(`Pasted ${add.length} layer${add.length > 1 ? 's' : ''}`);
+  }
+  /* copy the look of one layer onto others */
+  let styleClip = null;
+  const TYPE_KEYS = ['font', 'weight', 'italic', 'size', 'letter', 'lineH', 'caps', 'tcase', 'align', 'deco', 'outline', 'outlineC', 'hollow'];
+  function copyStyle() {
+    const it = selItems()[0]; if (!it) { toast('Select a layer to copy its style'); return; }
+    styleClip = { st: JSON.parse(JSON.stringify(it.st)), type: it.type === 'text' ? Object.fromEntries(TYPE_KEYS.map(k => [k, it[k]])) : null };
+    toast('Style copied');
+  }
+  function pasteStyle() {
+    if (!styleClip) { toast('Copy a style first (Ctrl Alt C)'); return; }
+    const items = selItems(); if (!items.length) { toast('Select layers to paste onto'); return; }
+    items.forEach(it => {
+      const keep = { weight: it.st.weight };
+      Object.assign(it.st, JSON.parse(JSON.stringify(styleClip.st)));
+      if (it.type === 'text' && styleClip.type) Object.assign(it, styleClip.type);
+      if (it.type === 'text' && !styleClip.type) it.st.weight = keep.weight;
+    });
+    commit(); render(); refreshPanels(); toast(`Style pasted on ${items.length} layer${items.length > 1 ? 's' : ''}`);
+  }
+
+  /* ---------------- images ----------------
+     A photo or a logo becomes a layer. Big ones are scaled to 2000px on
+     the long side so a file still fits in the browser's storage. */
+  function placeImageFile(file, at) {
+    const fr = new FileReader();
+    fr.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const w0 = img.naturalWidth || 400, h0 = img.naturalHeight || 400;
+        const k = Math.min(1, 2000 / Math.max(w0, h0));
+        const w = Math.round(w0 * k), h = Math.round(h0 * k);
+        let data = fr.result;
+        if (k < 1 || data.length > 1.6e6) {
+          const c = document.createElement('canvas'); c.width = w; c.height = h;
+          c.getContext('2d').drawImage(img, 0, 0, w, h);
+          data = c.toDataURL(/png|gif|webp/.test(file.type) ? 'image/png' : 'image/jpeg', .9);
+          if (data.length > 2.4e6) data = c.toDataURL('image/jpeg', .85);
+        }
+        const size = Math.min(doc.w, doc.h) * .6, ar = w / h;
+        const it = {
+          id: uid(), type: 'svg', image: 1, markup: `<image href="${data}" width="${w}" height="${h}" preserveAspectRatio="none"/>`, viewBox: `0 0 ${w} ${h}`,
+          x: 0, y: 0, w: ar >= 1 ? size : size * ar, h: ar >= 1 ? size / ar : size, rot: 0,
+          st: defaultStyle(), hidden: 0, locked: 0, name: (file.name || 'Image').replace(/\.[^.]+$/, '').slice(0, 28) || 'Image', ratio: 1,
+        };
+        if (at) { it.x = at.x - it.w / 2; it.y = at.y - it.h / 2; addItem(it); } else addItem(it, true);
+        toast('Image placed');
+      };
+      img.onerror = () => toast('could not read that image');
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  }
+  function openFile(f, at) {
+    if (!f) return;
+    const fr = new FileReader();
+    if (/\.svg$/i.test(f.name) || f.type === 'image/svg+xml') { fr.onload = () => placeSVGText(fr.result, f.name.replace(/\.svg$/i, '')); fr.readAsText(f); }
+    else if (/^image\//.test(f.type)) placeImageFile(f, at);
+    else if (/\.json$/i.test(f.name)) { fr.onload = () => { try { const d = JSON.parse(fr.result); d.id = d.id || 'd' + uid(); openDoc(d); toast('opened'); } catch (er) { toast('bad file'); } }; fr.readAsText(f); }
+    else toast('Motifs opens SVG, PNG, JPG, WebP, GIF and project files');
+  }
+  function onPaste(e) {
+    const t = e.target;
+    if (t instanceof Element && (/input|textarea|select/i.test(t.tagName) || t.isContentEditable)) return;
+    if ($('#home').classList.contains('on') || $('#modal').classList.contains('on')) return;
+    const cd = e.clipboardData; if (!cd) return;
+    const txt = cd.getData('text/plain') || '';
+    const clip = readClip();
+    if (clip && txt === 'scrawl:' + clip.t) { e.preventDefault(); pasteClip(false); return; }
+    const img = [...(cd.files || [])].find(f => /^image\//.test(f.type) && f.type !== 'image/svg+xml');
+    if (img) { e.preventDefault(); placeImageFile(img); return; }
+    const svgTxt = cd.getData('image/svg+xml') || (/^\s*<(\?xml|svg)/i.test(txt) ? txt : '');
+    if (svgTxt) { e.preventDefault(); placeSVGText(svgTxt, 'Pasted'); return; }
+    if (!txt.trim()) { if (clip) { e.preventDefault(); pasteClip(false); } return; }
+    // words from a brief become a text layer
+    e.preventDefault();
+    const b = board();
+    const it = makeText(txt.trim().slice(0, 4000), { x: 0, y: 0, w: b.w * .7, h: Math.min(b.h * .12 * (txt.trim().split('\n').length), b.h * .6) });
+    it.font = 'DM Sans'; it.weight = 500; it.align = 'start';
+    addItem(it, true); toast('Pasted as text');
+  }
+
+  /* ---------------- export ----------------
+     One dialog for every format: what to export, at what size, on paper
+     or transparent. It remembers what you chose last time. */
+  const EXKEY = 'scrawl.export';
+  const EXDEF = { fmt: 'png', scale: 2, clear: 0, scope: 'board', quality: .92 };
+  function exportPrefs() { try { return Object.assign({}, EXDEF, JSON.parse(localStorage.getItem(EXKEY) || '{}')); } catch (e) { return Object.assign({}, EXDEF); } }
+  const FMT = { png: ['PNG', 'image/png', 'png'], jpg: ['JPG', 'image/jpeg', 'jpg'], webp: ['WebP', 'image/webp', 'webp'], svg: ['SVG', 'image/svg+xml', 'svg'], pdf: ['PDF', 'application/pdf', 'pdf'] };
+  const slugOf = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'motifs';
+  async function withFonts(svg, items) {
+    const fams = fontUses(items);
+    if (fams.length) { const css = await inlineFonts(fams); if (css) svg = svg.replace('<defs>', `<defs><style>${css}</style>`); }
+    return svg;
+  }
+  async function targetSVG(t, clear) {
+    if (t.subset) return exportSVG(t.subset, { clear });
+    return withFonts(buildSVG(doc, true, t.board, null, { clear }), doc.items);
+  }
+  function svgImage(svg) {
+    return new Promise((res, rej) => {
+      const img = new Image();
+      img.onload = () => res(img); img.onerror = rej;
+      img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+    });
+  }
+  async function exportBlob(o, t) {
+    const clear = !!o.clear && o.fmt !== 'jpg' && o.fmt !== 'pdf';
+    const svg = await targetSVG(t, clear);
+    if (o.fmt === 'svg') return new Blob([svg], { type: 'image/svg+xml' });
+    const m = svg.match(/viewBox="([-\d.e]+) ([-\d.e]+) ([\d.e]+) ([\d.e]+)"/);
+    const w = m ? +m[3] : doc.w, h = m ? +m[4] : doc.h;
+    const img = await svgImage(svg);
+    const pxW = Math.max(1, Math.round(w * o.scale)), pxH = Math.max(1, Math.round(h * o.scale));
+    const c = document.createElement('canvas'); c.width = pxW; c.height = pxH;
+    const g = c.getContext('2d');
+    if (!clear) { g.fillStyle = '#ffffff'; g.fillRect(0, 0, pxW, pxH); }
+    g.drawImage(img, 0, 0, pxW, pxH);
+    if (o.fmt === 'pdf') {
+      const bin = atob(c.toDataURL('image/jpeg', .94).split(',')[1]);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return new Blob([makePDF(bytes, pxW, pxH, 96 * o.scale)], { type: 'application/pdf' });
+    }
+    return new Promise(r => c.toBlob(r, FMT[o.fmt][1], o.quality));
+  }
+  function exportTargets(o) {
+    if (o.scope === 'selection' && sel.size) return [{ subset: selItems(), name: o.name }];
+    if (o.scope === 'all') return doc.boards.map(b => ({ board: b, name: `${o.name}-${slugOf(b.name)}` }));
+    return [{ board: board(), name: o.name }];
+  }
+  let lastExport = null;
+  async function runExport(o) {
+    stopEdit();
+    const save = Object.assign({}, o); delete save.name;
+    try { localStorage.setItem(EXKEY, JSON.stringify(save)); } catch (e) { }
+    lastExport = o;
+    const ts = exportTargets(o);
+    toast(`Exporting ${ts.length > 1 ? ts.length + ' boards' : FMT[o.fmt][0]}…`);
+    try {
+      for (const t of ts) {
+        const blob = await exportBlob(o, t);
+        saveBlob(blob, t.name + '.' + FMT[o.fmt][2]);
+        if (ts.length > 1) await new Promise(r => setTimeout(r, 350));
+      }
+      toast(`${FMT[o.fmt][0]} saved${ts.length > 1 ? ' · ' + ts.length + ' files' : ''}`);
+    } catch (e) { console.warn(e); toast('Export failed — try SVG'); }
+  }
+  function exportAgain() { if (lastExport) runExport(Object.assign({}, lastExport, { name: slug() })); else openExport(); }
+
+  function openExport() {
+    stopEdit();
+    const o = exportPrefs(); o.name = slug();
+    if (o.scope === 'selection' && !sel.size) o.scope = 'board';
+    // a free plan never starts on an option it cannot use
+    if (!PLAN.can('vector') && (o.fmt === 'svg' || o.fmt === 'pdf')) o.fmt = 'png';
+    if (!PLAN.can('hiresExport') && o.scale > 2) o.scale = 2;
+    if (!PLAN.can('transparent')) o.clear = 0;
+    modal('Export', body => {
+      const grid = el('div', 'exgrid');
+      const prev = el('div', 'exprev'), side = el('div', 'exopts');
+      grid.append(prev, side); body.appendChild(grid);
+      const draw = () => {
+        // preview
+        const clear = o.clear && o.fmt !== 'jpg' && o.fmt !== 'pdf';
+        let svgm;
+        if (o.scope === 'selection' && sel.size) {
+          const items = selItems(), b = selBounds(items), pad = 2;
+          const sub = Object.assign({}, doc, { items, texture: 'none' });
+          svgm = buildSVG(sub, true, { x: b.x - pad, y: b.y - pad, w: b.r - b.x + pad * 2, h: b.b - b.y + pad * 2 }, null, { clear: 1 });
+        } else svgm = o.scope === 'all' ? buildSVG(doc, true, null, null, { clear }) : buildSVG(doc, true, board(), null, { clear });
+        prev.innerHTML = svgm;
+        prev.classList.toggle('checker', !!clear || (o.scope === 'selection' && sel.size > 0));
+        const sv = prev.querySelector('svg'); sv.removeAttribute('width'); sv.removeAttribute('height');
+
+        side.innerHTML = '';
+        const lab = t => el('div', 'exlab', t);
+        side.appendChild(lab('Format'));
+        side.appendChild(seg(Object.entries(FMT).map(([k, v]) => ({ v: k, label: v[0], pro: k === 'svg' || k === 'pdf' ? 'vector' : '' })), o.fmt, v => { o.fmt = v; draw(); }, 'wide'));
+        if (o.fmt !== 'svg') {
+          side.appendChild(lab('Size'));
+          side.appendChild(seg([.5, 1, 2, 3, 4].map(v => ({ v, label: v + '×', pro: v > 2 ? 'hiresExport' : '' })), o.scale, v => { o.scale = v; draw(); }, 'wide'));
+        }
+        side.appendChild(lab('What'));
+        side.appendChild(seg([{ v: 'board', label: 'This board' }, { v: 'all', label: `All boards (${doc.boards.length})`, disabled: doc.boards.length < 2 },
+          { v: 'selection', label: 'Selection', disabled: !sel.size }], o.scope, v => { o.scope = v; draw(); }, 'wide'));
+        if (o.fmt === 'png' || o.fmt === 'webp' || o.fmt === 'svg') {
+          side.appendChild(lab('Background'));
+          side.appendChild(seg([{ v: 0, label: 'Paper' }, { v: 1, label: 'Transparent', pro: 'transparent' }], o.clear ? 1 : 0, v => { o.clear = v; draw(); }, 'wide'));
+        }
+        if (o.fmt === 'jpg' || o.fmt === 'webp') side.appendChild(ctrlNum('Quality', o.quality, .5, 1, .01, v => { o.quality = v; }));
+        side.appendChild(lab('File name'));
+        const fn = el('div', 'field exname');
+        fn.innerHTML = `<input type="text" value="${esc(o.name)}" spellcheck="false"><label>.${FMT[o.fmt][2]}</label>`;
+        const fni = fn.querySelector('input');
+        fni.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') go.click(); };
+        fni.oninput = () => { o.name = fni.value.trim().replace(/[\\/:*?"<>|]+/g, '-') || 'motifs'; };
+        side.appendChild(fn);
+        // what will come out
+        const ts = exportTargets(o);
+        let dims = '';
+        if (o.fmt === 'svg') dims = 'Vector · fonts embedded';
+        else {
+          const t = ts[0];
+          const bw = t.subset ? (b => b.r - b.x + 4)(selBounds(t.subset)) : t.board.w, bh = t.subset ? (b => b.b - b.y + 4)(selBounds(t.subset)) : t.board.h;
+          dims = `${Math.round(bw * o.scale)} × ${Math.round(bh * o.scale)} px`;
+          if (o.fmt === 'pdf') dims += ` · ${(bw / 96).toFixed(2)} × ${(bh / 96).toFixed(2)} in`;
+        }
+        side.appendChild(el('p', 'exinfo', `${dims}${ts.length > 1 ? ` · ${ts.length} files` : ''}`));
+        const go = el('button', 'wide solid', `${icon('download', 15)}<span>Export ${FMT[o.fmt][0]}</span>`);
+        go.onclick = () => { closeModal(); runExport(Object.assign({}, o)); };
+        side.appendChild(go);
+        const more = el('div', 'exmore');
+        [['Print with bleed…', 'frame', () => { closeModal(); openPrint(); }, 'print'], ['Copy as SVG', 'copy', () => { closeModal(); copyAsSVG(); }, 'vector'],
+          ['Project file', 'file', () => { closeModal(); doExport('json'); }]].forEach(([t, ic, fnc, pro]) => {
+          const b = el('button', 'ghost', `${icon(ic, 14)}<span>${t}</span>${pro ? PLAN.badge(pro) : ''}`); b.onclick = fnc; more.appendChild(b);
+        });
+        side.appendChild(more);
+      };
+      draw();
+    });
+    $('#modal').classList.add('wide');
+  }
+
+  /* ---------------- menus, commands and keys ----------------
+     One list of everything the editor can do. The menu bar, the command
+     search and the keyboard all read from it, so a shortcut is only ever
+     defined once and always shows next to its command. */
+  const hasSel = () => sel.size > 0;
+  const selTexts = () => selItems().filter(i => i.type === 'text');
+  function eachText(fn) {
+    const t = selTexts(); if (!t.length) { toast('Select some text first'); return; }
+    t.forEach(fn); commit(); render(); refreshPanels();
+  }
+  /* bold and italic only switch to faces the family really has */
+  function toggleBold() {
+    const t = selTexts(); if (!t.length) return;
+    const heavy = wOf(t[0]) >= 600;
+    const can = t.filter(x => TYPE.weightsOf(x.font).length > 1);
+    if (!can.length) { toast(`${t[0].font} comes in one weight`); return; }
+    eachText(x => { x.weight = TYPE.nearestWeight(x.font, heavy ? 400 : 700); });
+  }
+  function toggleItalic() {
+    const t = selTexts(); if (!t.length) return;
+    const on = !t[0].italic;
+    const can = t.filter(x => !on || TYPE.hasItalic(x.font) || !TYPE.byName[x.font]);
+    if (!can.length) { toast(`${t[0].font} has no italic`); return; }
+    can.forEach(x => { x.italic = on ? 1 : 0; }); commit(); render(); refreshPanels();
+  }
+  function flipSel(ax) { const it = selItems(); if (!it.length) return; it.forEach(i => { i[ax] = !i[ax]; }); commit(); render(); refreshPanels(); }
+  function toggleSel(k) { const it = selItems(); if (!it.length) return; const v = it[0][k] ? 0 : 1; it.forEach(i => { i[k] = v; }); if (v && k === 'locked') sel.clear(); commit(); render(); refreshPanels(); }
+  function togglePanels() {
+    const both = document.body.classList.contains('no-left') && document.body.classList.contains('no-right');
+    document.body.classList.toggle('no-left', !both); document.body.classList.toggle('no-right', !both);
+    setTimeout(() => { drawUI(); drawRulers(); }, 30);
+  }
+  let nudgeT = null;
+  function nudge(dx, dy) {
+    const items = selItems().filter(i => !i.locked); if (!items.length) return;
+    items.forEach(i => { i.x += dx; i.y += dy; });
+    render(); refreshTransform(); updateStatus();
+    clearTimeout(nudgeT); nudgeT = setTimeout(commit, 350);
+  }
+
+  const A = [
+    // File
+    { id: 'new', menu: 'File', label: 'New from template…', icon: 'plus', key: 'Alt N', run: () => openHome('templates') },
+    { id: 'files', menu: 'File', label: 'Your files…', icon: 'files', key: 'Ctrl Shift O', run: () => openHome('files') },
+    { id: 'import', menu: 'File', label: 'Import image, SVG or project…', icon: 'upload', key: 'Ctrl O', run: () => $('#fileIn').click() },
+    { id: 'pasteSvg', menu: 'File', label: 'Paste SVG code…', icon: 'code', run: () => openPasteSVG() },
+    '-',
+    { id: 'save', menu: 'File', label: 'Save now', icon: 'save', key: 'Ctrl S', run: () => { saveCurrent(true); toast(storeOK ? 'Saved in this browser' : 'Storage is full — export a project file'); } },
+    { id: 'saveJson', menu: 'File', label: 'Download project file', icon: 'file', key: 'Ctrl Shift S', run: () => doExport('json') },
+    '-',
+    { id: 'export', menu: 'File', label: 'Export…', icon: 'download', key: 'Ctrl E', run: openExport },
+    { id: 'exportAgain', menu: 'File', label: 'Export again', key: 'Ctrl Shift E', run: exportAgain },
+    { id: 'print', menu: 'File', label: 'Print with bleed & crop marks…', icon: 'frame', key: 'Ctrl P', pro: 'print', run: () => openPrint() },
+    '-',
+    { id: 'brand', menu: 'File', label: 'Save colours & fonts as brand kit', icon: 'swatch', pro: 'brandKit', run: () => saveBrand() },
+    // Edit
+    { id: 'undo', menu: 'Edit', label: 'Undo', icon: 'undo', key: 'Ctrl Z', run: () => undo(), enabled: () => hi > 0 },
+    { id: 'redo', menu: 'Edit', label: 'Redo', icon: 'redo', key: 'Ctrl Shift Z', run: () => redo(), enabled: () => hi < history.length - 1 },
+    '-',
+    { id: 'cut', menu: 'Edit', label: 'Cut', icon: 'cut', key: 'Ctrl X', run: cutSel, enabled: hasSel },
+    { id: 'copy', menu: 'Edit', label: 'Copy', icon: 'copy', key: 'Ctrl C', run: () => copySel(), enabled: hasSel },
+    { id: 'paste', menu: 'Edit', label: 'Paste', icon: 'paste', key: 'Ctrl V', native: 1, run: () => pasteClip(false) },
+    { id: 'pasteInPlace', menu: 'Edit', label: 'Paste in place', key: 'Ctrl Shift V', run: () => pasteClip(true) },
+    { id: 'duplicate', menu: 'Edit', label: 'Duplicate', icon: 'duplicate', key: 'Ctrl D', run: () => duplicateSel(), enabled: hasSel },
+    { id: 'delete', menu: 'Edit', label: 'Delete', icon: 'trash', key: 'Del', native: 1, run: () => deleteSel(), enabled: hasSel },
+    '-',
+    { id: 'copyStyle', menu: 'Edit', label: 'Copy style', key: 'Ctrl Alt C', run: copyStyle, enabled: hasSel },
+    { id: 'pasteStyle', menu: 'Edit', label: 'Paste style', key: 'Ctrl Alt V', run: pasteStyle, enabled: () => hasSel() && !!styleClip },
+    { id: 'copySvg', menu: 'Edit', label: 'Copy as SVG', icon: 'code', key: 'Ctrl Shift C', pro: 'vector', run: () => copyAsSVG() },
+    '-',
+    { id: 'selectAll', menu: 'Edit', label: 'Select all', key: 'Ctrl A', run: () => { sel.clear(); doc.items.forEach(i => { if (!i.hidden && !i.locked) sel.add(i.id); }); render(); refreshPanels(); } },
+    { id: 'deselect', menu: 'Edit', label: 'Select none', key: 'Ctrl Shift A', run: () => { sel.clear(); render(); refreshPanels(); }, enabled: hasSel },
+    // Object
+    { id: 'group', menu: 'Object', label: 'Group', icon: 'group', key: 'Ctrl G', run: () => groupSel(), enabled: () => sel.size > 1 },
+    { id: 'ungroup', menu: 'Object', label: 'Ungroup', icon: 'ungroup', key: 'Ctrl Shift G', run: () => ungroupSel(), enabled: hasSel },
+    { id: 'repeat', menu: 'Object', label: 'Repeat…', icon: 'grid', key: 'Ctrl R', run: () => openRepeat(), enabled: hasSel },
+    '-',
+    { id: 'front', menu: 'Object', label: 'Bring to front', icon: 'front', key: 'Shift ]', run: () => orderSel('front'), enabled: hasSel },
+    { id: 'forward', menu: 'Object', label: 'Bring forward', icon: 'up', key: ']', run: () => orderSel('up'), enabled: hasSel },
+    { id: 'backward', menu: 'Object', label: 'Send backward', icon: 'down', key: '[', run: () => orderSel('down'), enabled: hasSel },
+    { id: 'back', menu: 'Object', label: 'Send to back', icon: 'back', key: 'Shift [', run: () => orderSel('back'), enabled: hasSel },
+    '-',
+    { id: 'alignL', menu: 'Object', label: 'Align left', icon: 'alignL', key: 'Alt A', run: () => alignSel('l'), enabled: hasSel },
+    { id: 'alignCH', menu: 'Object', label: 'Align centres across', icon: 'alignCH', key: 'Alt H', run: () => alignSel('cx'), enabled: hasSel },
+    { id: 'alignR', menu: 'Object', label: 'Align right', icon: 'alignR', key: 'Alt D', run: () => alignSel('r'), enabled: hasSel },
+    { id: 'alignT', menu: 'Object', label: 'Align top', icon: 'alignT', key: 'Alt W', run: () => alignSel('t'), enabled: hasSel },
+    { id: 'alignCV', menu: 'Object', label: 'Align centres down', icon: 'alignCV', key: 'Alt V', run: () => alignSel('cy'), enabled: hasSel },
+    { id: 'alignB', menu: 'Object', label: 'Align bottom', icon: 'alignB', key: 'Alt S', run: () => alignSel('b'), enabled: hasSel },
+    { id: 'distH', menu: 'Object', label: 'Distribute horizontally', icon: 'distH', key: 'Alt Shift H', run: () => distributeSel('h'), enabled: () => sel.size > 2 },
+    { id: 'distV', menu: 'Object', label: 'Distribute vertically', icon: 'distV', key: 'Alt Shift V', run: () => distributeSel('v'), enabled: () => sel.size > 2 },
+    '-',
+    { id: 'flipH', menu: 'Object', label: 'Flip horizontal', icon: 'flipH', key: 'Shift H', run: () => flipSel('flipX'), enabled: hasSel },
+    { id: 'flipV', menu: 'Object', label: 'Flip vertical', icon: 'flipV', key: 'Shift V', run: () => flipSel('flipY'), enabled: hasSel },
+    { id: 'lock', menu: 'Object', label: 'Lock / unlock', icon: 'lock', key: 'Ctrl Shift L', run: () => toggleSel('locked'), enabled: hasSel },
+    { id: 'hide', menu: 'Object', label: 'Hide / show', icon: 'eyeOff', key: 'Ctrl Shift H', run: () => toggleSel('hidden'), enabled: hasSel },
+    '-',
+    { id: 'editPts', menu: 'Object', label: 'Edit points or text', icon: 'pen', key: 'Enter', run: () => { const it = selItems()[0]; if (it) editItem(it); }, enabled: () => sel.size === 1 },
+    { id: 'reroll', menu: 'Object', label: 'Draw again with a new hand', icon: 'refresh', key: 'R', run: () => { selItems().forEach(i => { i.seed = rint(0, 99999); }); commit(); render(); }, enabled: hasSel },
+    // Type
+    { id: 'addText', menu: 'Type', label: 'Add text', icon: 'text', key: 'T', run: () => setTool('text') },
+    { id: 'font', menu: 'Type', label: 'Choose font…', icon: 'type', key: 'Ctrl Shift F', run: () => { if (!selTexts().length) { toast('Select some text first'); return; } document.body.classList.remove('no-right'); refreshPanels(); setTimeout(() => openFontPicker && openFontPicker(), 30); }, enabled: () => selTexts().length > 0 },
+    '-',
+    { id: 'bold', menu: 'Type', label: 'Bold', key: 'Ctrl B', run: toggleBold, enabled: () => selTexts().length > 0 },
+    { id: 'italic', menu: 'Type', label: 'Italic', icon: 'italic', key: 'Ctrl I', run: toggleItalic, enabled: () => selTexts().length > 0 },
+    { id: 'underline', menu: 'Type', label: 'Underline', icon: 'underline', key: 'Ctrl U', run: () => eachText(t => { t.deco = t.deco === 'underline' ? '' : 'underline'; }), enabled: () => selTexts().length > 0 },
+    { id: 'upper', menu: 'Type', label: 'Uppercase', key: 'Ctrl Shift U', run: () => eachText(t => { t.caps = t.caps ? 0 : 1; t.tcase = 'none'; }), enabled: () => selTexts().length > 0 },
+    '-',
+    { id: 'bigger', menu: 'Type', label: 'Bigger', key: 'Ctrl Shift .', run: () => eachText(t => { t.size = Math.round(t.size * 1.1 + .5); t.fit = 0; }), enabled: () => selTexts().length > 0 },
+    { id: 'smaller', menu: 'Type', label: 'Smaller', key: 'Ctrl Shift ,', run: () => eachText(t => { t.size = Math.max(1, Math.round(t.size / 1.1)); t.fit = 0; }), enabled: () => selTexts().length > 0 },
+    { id: 'tAlignL', menu: 'Type', label: 'Align text left', icon: 'tAlignL', key: 'Ctrl Alt L', run: () => eachText(t => { t.align = 'start'; }), enabled: () => selTexts().length > 0 },
+    { id: 'tAlignC', menu: 'Type', label: 'Centre text', icon: 'tAlignC', key: 'Ctrl Alt T', run: () => eachText(t => { t.align = 'middle'; }), enabled: () => selTexts().length > 0 },
+    { id: 'tAlignR', menu: 'Type', label: 'Align text right', icon: 'tAlignR', key: 'Ctrl Alt R', run: () => eachText(t => { t.align = 'end'; }), enabled: () => selTexts().length > 0 },
+    // View
+    { id: 'zoomIn', menu: 'View', label: 'Zoom in', key: 'Ctrl =', run: () => zoomAt(view.z * 1.25) },
+    { id: 'zoomOut', menu: 'View', label: 'Zoom out', key: 'Ctrl -', run: () => zoomAt(view.z / 1.25) },
+    { id: 'zoom100', menu: 'View', label: 'Actual size', key: 'Shift 0', run: () => zoomAt(1) },
+    { id: 'fit', menu: 'View', label: 'Fit everything', icon: 'fit', key: 'Shift 1', run: () => fitView() },
+    { id: 'zoomSel', menu: 'View', label: 'Zoom to selection', icon: 'target', key: 'Shift 2', run: zoomToSel },
+    { id: 'zoomBoard', menu: 'View', label: 'Zoom to board', key: 'Shift 3', run: () => zoomToRect(board()) },
+    '-',
+    { id: 'rulers', menu: 'View', label: 'Rulers', icon: 'ruler', key: 'Shift R', run: toggleRulers, checked: () => !!prefs.rulers },
+    { id: 'guides', menu: 'View', label: 'Guides', icon: 'guide', key: 'Ctrl ;', run: toggleGuides, checked: () => !!prefs.guides },
+    { id: 'clearGuides', menu: 'View', label: 'Clear guides', run: clearGuides, enabled: () => !!(doc.guides && doc.guides.length) },
+    { id: 'layout', menu: 'View', label: 'Layout grid', icon: 'layout', key: 'Shift G', run: toggleLayout, checked: () => !!(doc.layout && doc.layout.on) },
+    { id: 'status', menu: 'View', label: 'Status bar', icon: 'ruler', run: toggleStatus, checked: () => !!prefs.status },
+    { id: 'snap', menu: 'View', label: 'Snapping', icon: 'magnet', key: "Ctrl '", run: () => $('#btnSnap').click(), checked: () => snapOn },
+    '-',
+    { id: 'showLib', menu: 'View', label: 'Library', icon: 'grid', key: 'Alt 1', run: () => setLeftTab('lib'), checked: () => $('#left').dataset.tab === 'lib' },
+    { id: 'showLayers', menu: 'View', label: 'Layers', icon: 'layers', key: 'Alt 2', run: () => setLeftTab('layers'), checked: () => $('#left').dataset.tab === 'layers' },
+    { id: 'panels', menu: 'View', label: 'Hide panels', icon: 'panelL', key: 'Ctrl \\', run: togglePanels, checked: () => document.body.classList.contains('no-left') && document.body.classList.contains('no-right') },
+    { id: 'theme', menu: 'View', label: 'Dark mode', icon: 'moon', key: 'Ctrl Shift D', run: () => { toggleTheme(); drawRulers(); drawUI(); }, checked: () => document.documentElement.dataset.theme === 'dark' },
+    // Tools (command search and keys only)
+    { id: 'tSelect', tool: 'select', label: 'Select tool', icon: 'cursor', key: 'V', run: () => setTool('select') },
+    { id: 'tHand', tool: 'hand', label: 'Hand tool', icon: 'hand', key: 'H', run: () => setTool('hand') },
+    { id: 'tPen', tool: 'pen', label: 'Pen tool', icon: 'pen', key: 'P', run: () => setTool('pen') },
+    { id: 'tPencil', tool: 'pencil', label: 'Pencil tool', icon: 'brush', key: 'B', run: () => setTool('pencil') },
+    { id: 'tRect', tool: 'rect', label: 'Rectangle', icon: 'rect', key: 'M', run: () => setTool('rect') },
+    { id: 'tEllipse', tool: 'ellipse', label: 'Ellipse', icon: 'ellipse', key: 'O', run: () => setTool('ellipse') },
+    { id: 'tLine', tool: 'line', label: 'Line', icon: 'lineTool', key: 'L', run: () => setTool('line') },
+    { id: 'surprise', label: 'Surprise me — a whole composition', icon: 'sparkle', run: () => surprise() },
+    { id: 'palRand', label: 'Invent a palette', icon: 'palette', run: () => randomPalette() },
+    { id: 'recolour', label: 'Put every layer back on the palette', icon: 'palette', run: () => recolourAll(false) },
+    // Help
+    { id: 'palette', menu: 'Help', label: 'Search commands…', icon: 'command', key: 'Ctrl K', run: () => S.openCommands && S.openCommands() },
+    { id: 'keys', menu: 'Help', label: 'Keyboard shortcuts', icon: 'keyboard', key: 'Ctrl /', run: () => openShortcuts() },
+    { id: 'pro', menu: 'Help', label: 'Motifs Pro…', icon: 'sparkle', run: () => PLAN.openUpgrade() },
+  ];
+  const ACTIONS = A.filter(a => a !== '-');
+  const byId = {}; ACTIONS.forEach(a => { byId[a.id] = a; });
+  /* menus keep the separators where they were written */
+  const MENUS = ['File', 'Edit', 'Object', 'Type', 'View', 'Help'].map(m => {
+    const out = []; let last = null;
+    A.forEach(a => {
+      if (a === '-') { if (last === m && out.length && out[out.length - 1] !== '-') out.push('-'); return; }
+      last = a.menu;
+      if (a.menu === m) out.push(a.id);
+    });
+    if (out[out.length - 1] === '-') out.pop();
+    return [m, out];
+  });
+
+  const KEYCODE = { '[': 'BracketLeft', ']': 'BracketRight', '\\': 'Backslash', ';': 'Semicolon', "'": 'Quote', ',': 'Comma', '.': 'Period', '/': 'Slash', '=': 'Equal', '-': 'Minus', 'Del': 'Delete', 'Enter': 'Enter' };
+  function keyMatch(e, k) {
+    const parts = k.split(' '), key = parts.pop();
+    if ((e.ctrlKey || e.metaKey) !== parts.includes('Ctrl') || e.shiftKey !== parts.includes('Shift') || e.altKey !== parts.includes('Alt')) return false;
+    if (/^[A-Z]$/.test(key)) return e.code === 'Key' + key;
+    if (/^[0-9]$/.test(key)) return e.code === 'Digit' + key || e.code === 'Numpad' + key;
+    if (key === '=' && (e.code === 'NumpadAdd')) return true;
+    if (key === '-' && (e.code === 'NumpadSubtract')) return true;
+    return e.code === (KEYCODE[key] || key);
+  }
+  function runAction(id) {
+    const a = byId[id]; if (!a) return;
+    if (a.enabled && !a.enabled()) return;
+    hideMenu(); a.run();
+  }
+  const busy = () => editing || $('#modal').classList.contains('on') || $('#home').classList.contains('on') || (TYPE && TYPE.open);
+
+  function onStudioKey(e) {
+    const t = e.target;
+    if (t instanceof Element && (/input|textarea|select/i.test(t.tagName) || t.isContentEditable)) return;
+    if (e.repeat && !e.key.startsWith('Arrow') && !['KeyZ', 'KeyY', 'Equal', 'Minus'].includes(e.code)) return;
+    // Help and search open from anywhere
+    if (keyMatch(e, 'Ctrl K') || keyMatch(e, 'Ctrl /')) { e.preventDefault(); e.stopImmediatePropagation(); runAction(keyMatch(e, 'Ctrl K') ? 'palette' : 'keys'); return; }
+    if (busy()) return;
+    if (e.key.startsWith('Arrow') && !(e.ctrlKey || e.metaKey) && sel.size && !nodeEdit) {
+      e.preventDefault(); e.stopImmediatePropagation();
+      const n = e.shiftKey ? 10 : 1;
+      nudge(e.key === 'ArrowLeft' ? -n : e.key === 'ArrowRight' ? n : 0, e.key === 'ArrowUp' ? -n : e.key === 'ArrowDown' ? n : 0);
+      return;
+    }
+    if (e.key === 'Enter' && (pen || nodeEdit)) return;
+    for (const a of ACTIONS) {
+      if (!a.key || a.native) continue;
+      if (!keyMatch(e, a.key)) continue;
+      e.preventDefault(); e.stopImmediatePropagation();
+      runAction(a.id);
+      return;
+    }
+  }
+
+  /* Library and Layers share the left side as tabs, the arrangement most
+     design tools settled on, so Properties gets the whole right side. */
+  function setLeftTab(t) {
+    const left = $('#left'); if (!left) return;
+    left.dataset.tab = t;
+    $$('.ltabs button').forEach(b => b.classList.toggle('on', b.dataset.ltab === t));
+    document.body.classList.remove('no-left');
+    try { localStorage.setItem('scrawl.lefttab', t); } catch (e) { }
+  }
+  function dockLayers() {
+    const left = $('#left'), lp = $('#layersPane');
+    if (!left || !lp || $('#libPane')) return;
+    const pane = el('div'); pane.id = 'libPane';
+    [...left.children].forEach(c => pane.appendChild(c));
+    const tabs = el('div', 'ltabs');
+    tabs.innerHTML = `<button data-ltab="lib">${icon('grid', 14)}<span>Library</span></button><button data-ltab="layers">${icon('layers', 14)}<span>Layers</span></button>`;
+    tabs.querySelectorAll('button').forEach(b => { b.onclick = () => setLeftTab(b.dataset.ltab); });
+    left.append(tabs, pane, lp);
+    const cnt = $('#layerCount'); if (cnt) tabs.querySelector('[data-ltab="layers"]').appendChild(cnt);
+    let t = 'lib'; try { t = localStorage.getItem('scrawl.lefttab') || 'lib'; } catch (e) { }
+    setLeftTab(t);
+  }
+
+  /* ---------------- quiet chrome ----------------
+     The desktop layout keeps only what is used every minute on screen:
+     the zoom readout moves up beside Export, the palette folds away
+     under the file colours, and the status bar waits in the View menu. */
+  function quietChrome() {
+    const zt = $('#zoomTop'), zl = $('#zoomLbl');
+    if (zt) {
+      zt.innerHTML = `<span class="zv"></span>${icon('chevD', 12)}`;
+      const sync = () => { zt.firstChild.textContent = zl.textContent; };
+      sync(); new MutationObserver(sync).observe(zl, { childList: true, characterData: true, subtree: true });
+      zt.onclick = zoomMenu;
+    }
+    const pro = $('#btnPro');
+    if (pro) {
+      const t = PLAN.tier();
+      pro.hidden = t === 'pro';
+      pro.innerHTML = `${icon('sparkle', 14)}<span>${t === 'free' ? 'Upgrade' : 'Pro'}</span>`;
+      pro.title = t === 'free' ? 'Motifs Pro — $9 a month or $49 once' : 'Motifs Pro is free while in beta';
+      pro.onclick = () => PLAN.openUpgrade();
+    }
+    document.body.classList.toggle('showstatus', !!prefs.status);
+    // right panel: a colour section that folds, and no second heading
+    const heads = $$('#right > .phead');
+    if (heads[1]) heads[1].classList.add('propshead');
+    const ph = heads[0];
+    if (ph && !ph.querySelector('.palname')) {
+      const tt = ph.querySelector('.ttl');
+      tt.classList.add('paltoggle'); tt.setAttribute('role', 'button'); tt.tabIndex = 0;
+      const open = () => { try { return localStorage.getItem('scrawl.palopen') !== '0'; } catch (e) { return true; } };
+      const sync = () => { $('#right').classList.toggle('palclosed', !open()); tt.title = open() ? 'Fold palettes away' : 'Show palettes'; };
+      tt.innerHTML = `${icon('chevD', 13, 'class="ic caret"')}<span>Colours</span><em class="palname"></em>`;
+      tt.onclick = () => { try { localStorage.setItem('scrawl.palopen', open() ? '0' : '1'); } catch (e) { } sync(); };
+      tt.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tt.click(); } };
+      sync();
+    }
+  }
+  function syncPalName() {
+    const n = $('#right .palname'); if (!n) return;
+    const pal = doc.palIdx >= 0 ? S.stylePalettes(libStyle)[doc.palIdx] : null;
+    n.textContent = pal ? pal[0] : doc.palIdx === -1 && brand() ? 'Brand kit' : 'Custom';
+  }
+
+  function bindStudio() {
+    const vp = $('#viewport');
+    dockLayers();
+    bindRulers();
+    document.addEventListener('paste', onPaste);
+    vp.addEventListener('pointermove', e => { if (!drag || drag.mode !== 'guide') updateStatus(toDoc(e)); });
+    vp.addEventListener('pointerleave', () => { lastPt = null; updateStatus(); });
+    // zoom around the centre, not the corner
+    $('#btnZoomIn').onclick = () => zoomAt(view.z * 1.25);
+    $('#btnZoomOut').onclick = () => zoomAt(view.z / 1.25);
+    $('#zoomLbl').onclick = zoomMenu; $('#zoomLbl').title = 'Zoom options';
+    quietChrome();
+    $('#themeBtn').addEventListener('click', () => { drawRulers(); drawUI(); });
+    $('#btnCmd') && ($('#btnCmd').onclick = () => runAction('palette'));
+    // drop files, or pieces dragged out of the library, straight onto the canvas
+    let dragDepth = 0;
+    vp.addEventListener('dragenter', e => { e.preventDefault(); dragDepth++; vp.classList.add('dropping'); });
+    vp.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; vp.classList.remove('dropping'); } });
+    vp.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+    vp.addEventListener('drop', e => {
+      e.preventDefault(); dragDepth = 0; vp.classList.remove('dropping');
+      const p = toDoc(e);
+      const pid = e.dataTransfer.getData('text/x-motifs-piece');
+      if (pid !== '') {
+        const pre = PRESETS[+pid];
+        if (pre) { const s = Math.min(doc.w, doc.h) * .4; addItem(itemFromPreset(pre, { x: p.x - s / 2, y: p.y - s / 2, w: s, h: s })); }
+        return;
+      }
+      [...e.dataTransfer.files].forEach((f, i) => openFile(f, { x: p.x + i * 30, y: p.y + i * 30 }));
+    });
+    $('#fileIn').setAttribute('accept', '.json,.svg,image/svg+xml,image/png,image/jpeg,image/webp,image/gif');
+    $('#fileIn').onchange = e => { [...e.target.files].forEach(f => openFile(f)); e.target.value = ''; };
+    new ResizeObserver(() => { drawRulers(); }).observe(vp);
+    TYPE.onChange(() => { if (doc) drawRulers(); });
+    S.studio = {
+      actions: ACTIONS, menus: MENUS, byId, run: runAction,
+      pieces: () => PRESETS.map((p, i) => ({ p, i })).filter(x => x.p.style === libStyle).map(x => ({ label: x.p.name, sub: x.p.cat, run: () => { const s = Math.min(doc.w, doc.h) * .4; addItem(itemFromPreset(x.p, { x: 0, y: 0, w: s, h: s }), true); } })),
+      get tool() { return tool; }, get sel() { return sel; }, fmtKey,
+    };
+    // the menu bar takes its keys first while it is open
+    if (S.initStudioUI) S.initStudioUI(S.studio);
+    addEventListener('keydown', onStudioKey, true);
+    updateStatus(); setSaveState('Saved');
   }
 
   /* ==========================================================
@@ -2387,6 +3667,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     $$('#homeNav button').forEach(b => b.onclick = () => { homeTab = b.dataset.tab; renderHome(); });
     $('#homeNew').onclick = () => { homeTab = 'templates'; renderHome(); };
 
+    bindStudio();
     addEventListener('resize', () => { drawUI(); if (editing) syncEditor(); });
   }
 
@@ -2397,6 +3678,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     const rec = s.cur && s.docs[s.cur];
     const firstWarli = TEMPLATES.findIndex(t => t.style === 'warli');
     doc = migrateBoards(rec ? rec.doc : docFromTemplate(TEMPLATES[firstWarli >= 0 ? firstWarli : 0]));
+    followDocStyle();
     bind(); setTool('select'); paintIcons();
     $('#btnSnap').classList.toggle('on', snapOn);
     buildStylePicker(); buildPalettes(); buildLibrary(); refreshPanels(); render(); fitView(); commit();
