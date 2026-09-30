@@ -356,7 +356,8 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   function fitView() {
     const vp = $('#viewport').getBoundingClientRect(), bb = boardsBounds();
     const W = bb.r - bb.x, H = bb.b - bb.y;
-    view.z = Math.min((vp.width - 120) / W, (vp.height - 140) / H);
+    const padX = vp.width < 700 ? 32 : 120, padY = vp.width < 700 ? 150 : 140;
+    view.z = Math.min((vp.width - padX) / W, (vp.height - padY) / H);
     view.ox = (vp.width - W * view.z) / 2 - bb.x * view.z;
     view.oy = (vp.height - H * view.z) / 2 - 12 - bb.y * view.z;
     applyView(); drawUI();
@@ -410,6 +411,9 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
 
   /* ---------------- selection chrome ---------------- */
   const HANDLES = [[0, 0], [.5, 0], [1, 0], [1, .5], [1, 1], [.5, 1], [0, 1], [0, .5]];
+  /* fingers need bigger handles and a wider catch than a cursor does */
+  const coarse = matchMedia('(pointer: coarse)');
+  const touchK = () => coarse.matches ? 1.7 : 1;
   /* canvas chrome reads from the same palette as the interface */
   const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
   let SEL = '#2B5FD9', GUIDE = '#D2432B';
@@ -429,11 +433,11 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       s += `<g transform="translate(${cx} ${cy}) rotate(${it.rot})">
         <rect x="${-it.w / 2}" y="${-it.h / 2}" width="${it.w}" height="${it.h}" fill="none" stroke="${SEL}" stroke-width="${1.5 * k}"/>`;
       if (sel.size === 1 && !it.locked && !editing) {
-        const hs = 8 * k;
+        const hs = 8 * k * touchK(), rk = 5.5 * k * touchK();
         HANDLES.forEach(([hx, hy]) => {
           s += `<rect x="${-it.w / 2 + it.w * hx - hs / 2}" y="${-it.h / 2 + it.h * hy - hs / 2}" width="${hs}" height="${hs}" rx="${1.5 * k}" fill="#fff" stroke="${SEL}" stroke-width="${1.4 * k}"/>`;
         });
-        s += `<line x1="0" y1="${-it.h / 2}" x2="0" y2="${-it.h / 2 - 26 * k}" stroke="${SEL}" stroke-width="${1.4 * k}"/><circle cx="0" cy="${-it.h / 2 - 30 * k}" r="${5.5 * k}" fill="#fff" stroke="${SEL}" stroke-width="${1.4 * k}"/>`;
+        s += `<line x1="0" y1="${-it.h / 2}" x2="0" y2="${-it.h / 2 - 26 * k}" stroke="${SEL}" stroke-width="${1.4 * k}"/><circle cx="0" cy="${-it.h / 2 - 30 * k}" r="${rk}" fill="#fff" stroke="${SEL}" stroke-width="${1.4 * k}"/>`;
       }
       s += '</g>';
     });
@@ -443,7 +447,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     if (!doc.items.length && !pen) {
       const cx = doc.w / 2, cy = doc.h / 2, fs = 15 * k;
       s += `<g opacity=".45" style="font-family:'DM Sans',sans-serif">
-        <text x="${cx}" y="${cy - fs * .6}" font-size="${fs}" text-anchor="middle" fill="${doc.colors[0]}">Click a piece in the Library to place it</text>
+        <text x="${cx}" y="${cy - fs * .6}" font-size="${fs}" text-anchor="middle" fill="${doc.colors[0]}">${coarse.matches ? 'Tap' : 'Click'} a piece in the Library to place it</text>
         <text x="${cx}" y="${cy + fs * 1.1}" font-size="${fs * .88}" text-anchor="middle" fill="${doc.colors[0]}">or press ✦ Surprise for a whole composition</text>
       </g>`;
     }
@@ -459,7 +463,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       if (nodeEdit.type === 'path' && nodeEdit.strokes[activeStroke]) {
         s += `<path d="${nodeEdit.strokes[activeStroke].d}" fill="none" stroke="${SEL}" stroke-width="${1.6 * k * 100 / nodeEdit.w}" opacity=".9" transform="translate(${nodeEdit.x} ${nodeEdit.y}) scale(${nodeEdit.w / 100} ${nodeEdit.h / 100})"/>`;
       }
-      const r = (nodeList.length > 60 ? 3.6 : 4.8) * k;
+      const r = (nodeList.length > 60 ? 3.6 : 4.8) * k * touchK();
       nodeList.forEach((h, i) => {
         const P = genToDoc(nodeEdit, h.x, h.y);
         s += `<circle cx="${P.x}" cy="${P.y}" r="${i === dragNode ? r * 1.5 : r}" fill="${i === dragNode ? '${SEL}' : '#fff'}" stroke="${SEL}" stroke-width="${1.5 * k}"/>`;
@@ -495,7 +499,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   function hitHandle(p) {
     if (sel.size !== 1 || editing) return null;
     const it = doc.items.find(i => sel.has(i.id)); if (!it || it.locked) return null;
-    const L = localOf(it, p), tol = 11 / view.z;
+    const L = localOf(it, p), tol = 11 * touchK() / view.z;
     if (Math.hypot(L.x - it.w / 2, L.y + 30 / view.z) < tol) return { it, mode: 'rot' };
     for (let i = 0; i < HANDLES.length; i++) {
       const [hx, hy] = HANDLES[i];
@@ -680,7 +684,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   }
   function hitNode(p) {
     if (!nodeEdit) return -1;
-    const tol = 9 / view.z;
+    const tol = 9 * touchK() / view.z;
     let best = -1, bestD = tol;
     nodeList.forEach((h, i) => {
       const P = genToDoc(nodeEdit, h.x, h.y);
@@ -1216,6 +1220,19 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
           w.appendChild(line); m.appendChild(w);
           return;
         }
+        if (row.tools) {
+          const w = el('div', 'ctxrow');
+          w.innerHTML = `<span class="ctxlbl">${row.label}</span>`;
+          const line = el('div', 'ctxtools');
+          row.tools.forEach(t => {
+            const b = el('button', 'ico');
+            b.innerHTML = icon(t.icon, 16); b.title = t.title;
+            b.onclick = () => { hideMenu(); t.fn(); };
+            line.appendChild(b);
+          });
+          w.appendChild(line); m.appendChild(w);
+          return;
+        }
         const b = el('button', 'ctxitem' + (row.danger ? ' danger' : ''));
         b.innerHTML = `${row.icon ? icon(row.icon, 15) : '<i class="icspace"></i>'}<span>${row.label}</span>${row.key ? `<kbd>${row.key}</kbd>` : ''}`;
         b.onclick = () => { hideMenu(); row.fn(); };
@@ -1257,6 +1274,13 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     if (one.type === 'shape') {
       groups.push([{ label: 'Fill', swatches: 1, current: one.st.fill, pick: v => { items.forEach(i => i.st.fill = v); commit(); render(); refreshPanels(); } },
       { label: 'Accent', swatches: 1, current: one.st.accent, pick: v => { items.forEach(i => i.st.accent = v); commit(); render(); refreshPanels(); } }]);
+    }
+    // the header's align row is hidden on small screens, so it lives here too
+    if (compact.matches) {
+      const A = (icon, title, m) => ({ icon, title, fn: () => alignSel(m) });
+      const arrange = [{ label: 'Align', tools: [A('alignL', 'Align left', 'l'), A('alignCH', 'Centre across', 'cx'), A('alignR', 'Align right', 'r'), A('alignT', 'Align top', 't'), A('alignCV', 'Centre down', 'cy'), A('alignB', 'Align bottom', 'b')] }];
+      if (items.length > 2) arrange.push({ label: 'Spread', tools: [{ icon: 'distH', title: 'Distribute horizontally', fn: () => distributeSel('h') }, { icon: 'distV', title: 'Distribute vertically', fn: () => distributeSel('v') }] });
+      groups.push(arrange);
     }
     groups.push(
       [{ label: 'Bring to front', icon: 'front', fn: () => orderSel('front') },
@@ -1348,6 +1372,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       cell.onclick = () => {
         const s = Math.min(doc.w, doc.h) * .4;
         addItem(itemFromPreset(pre, { x: 0, y: 0, w: s, h: s }), true);
+        closeDrawers();
       };
       cell.oncontextmenu = ev => { ev.preventDefault(); openVariants(pre); };
       grid.appendChild(cell);
@@ -2253,7 +2278,19 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     $('#themeBtn').title = t === 'dark' ? 'Light mode' : 'Dark mode';
   }
   const toggleTheme = () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
-  function togglePanel(side) { document.body.classList.toggle('no-' + side); setTimeout(drawUI, 30); }
+  /* Wide screens hide and show the side panels in place. Narrow ones keep them
+     shut and slide one over the canvas at a time. */
+  const compact = matchMedia('(max-width: 1024px)');
+  function togglePanel(side) {
+    if (compact.matches) {
+      const open = !document.body.classList.contains('show-' + side);
+      closeDrawers();
+      document.body.classList.toggle('show-' + side, open);
+      return;
+    }
+    document.body.classList.toggle('no-' + side); setTimeout(drawUI, 30);
+  }
+  function closeDrawers() { document.body.classList.remove('show-left', 'show-right'); }
 
   function setTool(t) {
     // any tool change abandons a half-drawn path — picking up the pen again
@@ -2265,6 +2302,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     $('#penHint').classList.toggle('on', t === 'pen');
     $('#pencilHint').classList.toggle('on', t === 'pencil');
     $('#toolOpts').classList.toggle('on', t === 'pen' || t === 'pencil');
+    $('#toolOpts').classList.toggle('pen', t === 'pen');
   }
 
   /* ==========================================================
@@ -2275,15 +2313,76 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     // The dock and the panel tabs live inside #viewport. Capturing the pointer
     // here retargets the follow-up click to #viewport, so those buttons never
     // fire — only take the event when it really started on the canvas.
+    // Touch: one finger works like the mouse, a second finger turns whatever
+    // the first was doing into a pinch (zoom + pan), and holding still opens
+    // the context menu, since phones have no right button.
+    const fingers = new Map();
+    let pinch = null, press = null, swallowClick = false;
+    addEventListener('click', e => {
+      if (!swallowClick) return;
+      swallowClick = false; e.preventDefault(); e.stopPropagation();
+    }, true);
+    const cancelPress = () => { if (press) { clearTimeout(press.timer); press = null; } };
+    function startPinch() {
+      cancelPress();
+      if (drag) {
+        if (drag.snap && ['move', 'scale', 'rot'].includes(drag.mode))
+          doc.items.forEach(i => { const s = drag.snap[i.id]; if (s) Object.assign(i, s); });
+        if (drag.mode === 'draw') pen = null;
+        marquee = null; drag = null; guides = []; render();
+      }
+      const [a, b] = [...fingers.values()], r = vp.getBoundingClientRect();
+      pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, mx: (a.x + b.x) / 2 - r.left, my: (a.y + b.y) / 2 - r.top, z: view.z, ox: view.ox, oy: view.oy };
+    }
+    function movePinch() {
+      const [a, b] = [...fingers.values()], r = vp.getBoundingClientRect();
+      const mx = (a.x + b.x) / 2 - r.left, my = (a.y + b.y) / 2 - r.top;
+      const nz = clamp(pinch.z * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d, .03, 10);
+      view.ox = mx - (pinch.mx - pinch.ox) * (nz / pinch.z);
+      view.oy = my - (pinch.my - pinch.oy) * (nz / pinch.z);
+      view.z = nz;
+      applyView(); drawUI();
+      $('#zoomLbl').textContent = Math.round(view.z * 100) + '%';
+    }
     vp.addEventListener('pointerdown', e => {
       const t = e.target;
       const onCanvas = t === vp || (t instanceof Element && t.closest('#wrap'));
       if (!onCanvas) return;
+      if (e.pointerType === 'touch') {
+        fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (fingers.size === 2) { startPinch(); return; }
+        if (fingers.size > 2) return;
+        cancelPress();
+        press = { x: e.clientX, y: e.clientY, timer: setTimeout(() => {
+          const at = press; press = null;
+          if (!at || fingers.size !== 1 || editing || nodeEdit || pen) return;
+          if (drag && drag.snap && drag.mode === 'move') doc.items.forEach(i => { const s = drag.snap[i.id]; if (s) Object.assign(i, s); });
+          marquee = null; drag = null; guides = []; render();
+          onContext({ preventDefault() { }, clientX: at.x, clientY: at.y });
+          // lifting the finger would otherwise click whatever menu row opened under it
+          swallowClick = true;
+        }, 520) };
+      }
       try { vp.setPointerCapture(e.pointerId); } catch (er) { }
       onDown(e);
     });
-    vp.addEventListener('pointermove', onMove);
-    vp.addEventListener('pointerup', onUp);
+    vp.addEventListener('pointermove', e => {
+      if (e.pointerType === 'touch' && fingers.has(e.pointerId)) {
+        fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 8) cancelPress();
+        if (pinch) { if (fingers.size >= 2) movePinch(); return; }
+      }
+      onMove(e);
+    });
+    const liftFinger = e => {
+      if (e.pointerType !== 'touch') return false;
+      fingers.delete(e.pointerId); cancelPress();
+      if (swallowClick) setTimeout(() => { swallowClick = false; }, 400);
+      if (pinch) { if (fingers.size < 2) pinch = null; return true; }
+      return false;
+    };
+    vp.addEventListener('pointerup', e => { if (!liftFinger(e)) onUp(e); });
+    vp.addEventListener('pointercancel', e => { if (!liftFinger(e)) onUp(e); });
     vp.addEventListener('contextmenu', onContext);
     vp.addEventListener('dblclick', e => { if (tool === 'pen') finishPen(false); });
     vp.addEventListener('wheel', e => {
@@ -2318,7 +2417,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
       if (meta) return;
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSel(); }
       if (e.key === 'Enter' && pen) { e.preventDefault(); finishPen(false); }
-      if (e.key === 'Escape') { if (nodeEdit) { stopNodeEdit(); return; } if (pen) { pen = null; setTool('select'); drawUI(); return; } hideMenu(); closeModal(); stopEdit(); sel.clear(); render(); refreshPanels(); }
+      if (e.key === 'Escape') { if (document.body.matches('.show-left,.show-right')) { closeDrawers(); return; } if (nodeEdit) { stopNodeEdit(); return; } if (pen) { pen = null; setTool('select'); drawUI(); return; } hideMenu(); closeModal(); stopEdit(); sel.clear(); render(); refreshPanels(); }
       if (e.key === 'v' || e.key === 'V') setTool('select');
       if (e.key === 'h' || e.key === 'H') setTool('hand');
       if (e.key === 't' || e.key === 'T') setTool('text');
@@ -2362,6 +2461,16 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     $('#btnRecolour').onclick = e => recolourAll(e.shiftKey);
     $('#toggleLeft').onclick = () => togglePanel('left');
     $('#toggleRight').onclick = () => togglePanel('right');
+    $('#scrim').onclick = closeDrawers;
+    $$('.sheetClose').forEach(b => b.onclick = closeDrawers);
+    $('#penDone').onclick = () => finishPen(false);
+    if (coarse.matches) {
+      // no keyboard to lean on, so the hints talk about taps
+      $('#penHint').textContent = 'Tap to place points · tap the first point or Done to finish';
+      $('#editHint').textContent = 'Editing text · tap outside to finish';
+      $('#nodeHint').textContent = 'Editing points · drag to move, tap outside to finish';
+    }
+    compact.addEventListener('change', () => { closeDrawers(); setTimeout(fitView, 60); });
     $$('[data-align]').forEach(b => b.onclick = () => alignSel(b.dataset.align));
     $$('[data-dist]').forEach(b => b.onclick = () => distributeSel(b.dataset.dist));
     $('#btnGroup').onclick = groupSel;

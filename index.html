@@ -2,7 +2,8 @@
 <html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#FCFCFA">
 <title>Motifs — pattern from a rule</title>
 <meta name="description" content="A drawing machine. Every mark is generated, so nothing is stock.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -142,7 +143,7 @@ body.no-left #left,body.no-right #right{border:0}
 .boardrow:hover .ico{opacity:1}
 
 /* ================= viewport ================= */
-#viewport{position:relative;overflow:hidden;background:var(--canvas);
+#viewport{position:relative;overflow:hidden;background:var(--canvas);touch-action:none;
   background-image:radial-gradient(circle at 1px 1px,rgba(26,25,23,.055) 1px,transparent 0);
   background-size:22px 22px}
 #viewport[data-cursor="default"]{cursor:default}
@@ -248,16 +249,18 @@ select.wide{margin-bottom:6px}
 .lbtn:hover{color:var(--txt)}
 
 /* ================= context menu ================= */
-#ctxmenu{position:fixed;z-index:60;min-width:216px;background:var(--panel);border:1px solid var(--line);
+#ctxmenu{position:fixed;z-index:60;min-width:216px;width:max-content;max-width:calc(100vw - 16px);background:var(--panel);border:1px solid var(--line);
   border-radius:var(--rl);box-shadow:var(--pop);padding:5px;display:none}
-#ctxmenu.on{display:block}
-.ctxitem{width:100%;justify-content:flex-start;padding:7px 9px;font-weight:400;font-size:12.5px;gap:9px}
+#ctxmenu.on{display:flex;flex-direction:column}
+.ctxitem{justify-content:flex-start;padding:7px 9px;font-weight:400;font-size:12.5px;gap:9px}
 .ctxitem kbd{margin-left:auto;background:transparent;border:0;color:var(--dim);font:11px 'DM Mono';padding:0}
 .ctxsep{height:1px;background:var(--line);margin:5px 4px}
 .ctxrow{display:flex;align-items:center;gap:9px;padding:5px 9px}
 .ctxlbl{font-size:12.5px;color:var(--dim);min-width:44px}
 .ctxcolors{display:flex;gap:4px}
 .ctxcolors .cdot{width:19px;height:19px}
+.ctxtools{display:flex;gap:2px;flex-wrap:wrap}
+.ctxtools button{padding:6px;min-width:0}
 
 /* ================= modal ================= */
 #modal{position:fixed;inset:0;background:rgba(0,0,0,.4);backdrop-filter:blur(3px);display:none;
@@ -292,6 +295,7 @@ kbd{background:var(--sunk);border:1px solid var(--line);border-bottom-width:2px;
   overflow:hidden;padding:0;text-align:left;display:flex;flex-direction:column;cursor:pointer}
 .filecard:hover{border-color:var(--blue);box-shadow:0 0 0 3px var(--blueSoft)}
 .filecard.cur{border-color:var(--blue)}
+.filecard>:not(.filemore){width:100%;min-width:0}
 .tplprev{height:172px;background:var(--sunk);display:grid;place-items:center;overflow:hidden;padding:12px}
 .tplprev svg{max-width:100%;max-height:100%;box-shadow:0 2px 10px rgba(0,0,0,.16)}
 .fileinfo{padding:10px 12px;border-top:1px solid var(--line)}
@@ -302,6 +306,111 @@ kbd{background:var(--sunk);border:1px solid var(--line);border-bottom-width:2px;
 .filecard:hover .filemore{opacity:1}
 
 @media (max-width:1200px){:root{--leftW:240px;--rightW:266px}.libgrid{grid-template-columns:repeat(2,1fr)}#pals{grid-template-columns:repeat(6,1fr)}}
+
+/* ================= small screens =================
+   At 1024px and below the canvas gets the whole width and the two panels become
+   drawers (tablet) or bottom sheets (phone) you pull in when you need them. */
+.panelTab span,.sheetClose,#scrim,#penDone{display:none}
+#toolOpts.pen #penDone{display:inline-flex}
+#shell{position:relative}
+
+@media (max-width:1024px){
+  body{grid-template-rows:50px minmax(0,1fr)}
+  #shell,body.no-left #shell,body.no-right #shell,body.no-left.no-right #shell{grid-template-columns:minmax(0,1fr)}
+  #viewport{grid-column:1;grid-row:1}
+  aside{position:absolute;top:0;bottom:0;z-index:20;width:min(340px,86vw);box-shadow:var(--pop);
+    transition:transform .24s cubic-bezier(.2,.8,.2,1),visibility .24s;visibility:hidden}
+  #left{left:0;transform:translateX(-102%)}
+  #right{right:0;transform:translateX(102%)}
+  body.no-left #left,body.no-right #right{border:0}
+  body.show-left #left,body.show-right #right{transform:none;visibility:visible}
+  #scrim{display:block;position:absolute;inset:0;z-index:19;background:rgba(20,18,15,.28);opacity:0;
+    pointer-events:none;transition:opacity .2s}
+  body.show-left #scrim,body.show-right #scrim{opacity:1;pointer-events:auto}
+  .sheetClose{display:inline-flex}
+  .panelTab{width:auto;height:36px;padding:0 12px 0 10px;gap:7px;border-radius:99px;color:var(--txt);box-shadow:var(--shadow)}
+  .panelTab span{display:inline;font:600 12.5px 'DM Sans'}
+  #toast,.hintpill{top:58px}
+  .hintpill{max-width:calc(100% - 24px);white-space:normal;text-align:center}
+  /* the header keeps what you reach for on a phone and scrolls for the rest */
+  #btnHome span,#btnNew span{display:none}
+  #btnHome,#btnNew{padding:6px 8px}
+  #docName{max-width:150px}
+  header .arrange{display:none}
+  .brand{margin-right:4px}
+  #home{grid-template-columns:minmax(0,1fr);grid-template-rows:56px auto minmax(0,1fr)}
+  .homeside{flex-direction:row;border-right:0;border-bottom:1px solid var(--line);padding:8px 12px;overflow-x:auto}
+  .homeside button{flex:none}
+  .homemain{padding:18px 16px 60px}
+  #homeGrid{grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:14px}
+  #homeSearch{flex:1 1 auto;min-width:0;max-width:none}
+}
+
+@media (max-width:640px){
+  /* on a phone the panels rise from the bottom, so your thumb reaches them */
+  aside{top:auto;left:0;right:0;width:auto;height:min(74dvh,640px);max-height:calc(100% - 20px);
+    border:0!important;border-radius:16px 16px 0 0;padding-bottom:env(safe-area-inset-bottom)}
+  aside::before{content:'';position:absolute;top:6px;left:50%;width:38px;height:4px;margin-left:-19px;
+    border-radius:4px;background:var(--line2)}
+  aside .phead:first-child{padding-top:15px}
+  #left,#right{transform:translateY(102%)}
+  #right{overflow-y:auto;overscroll-behavior:contain}
+  #right .pbody{flex:none;overflow:visible}
+  #right .pbody::after{display:none}
+  #layersPane{height:auto;min-height:150px}
+  #layers{overflow:visible}
+  .libgrid{grid-template-columns:repeat(auto-fill,minmax(92px,1fr))}
+  #pals{grid-template-columns:repeat(auto-fill,minmax(40px,1fr))}
+  .palbox{max-height:none}
+  .brand b,#btnKeys,#btnImport,#btnNew,header .sep{display:none}
+  header{gap:2px;padding:0 8px}
+  #btnExport span{display:none}
+  #btnExport{padding:6px 10px}
+  #docName{max-width:120px;padding:5px 6px}
+  .grow{min-width:2px}
+  .dock{bottom:calc(12px + env(safe-area-inset-bottom));max-width:calc(100% - 16px);padding:4px;gap:0}
+  .dock #btnSurprise span,.dock #btnZoomIn,.dock #btnZoomOut{display:none}
+  .dock .sep{margin:0 2px}
+  #zoomLbl{min-width:40px}
+  .toolopts{bottom:calc(70px + env(safe-area-inset-bottom))}
+  #modal{padding:0;align-items:flex-end}
+  .sheet{width:100%;max-height:92dvh;border-radius:16px 16px 0 0;border-bottom:0}
+  #modalBody{padding:14px 14px calc(18px + env(safe-area-inset-bottom))}
+  .vgrid{grid-template-columns:repeat(4,1fr)}
+  #homeBack span{display:none}
+  #homeGrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .tplprev{height:128px;padding:8px}
+  .keys{grid-template-columns:1fr}
+  #ctxmenu{max-height:calc(100dvh - 16px);overflow-y:auto;min-width:200px}
+}
+
+/* ================= touch =================
+   Fingers are wider than cursors, and nothing on a touch screen can hover. */
+@media (pointer:coarse){
+  button.ico{min-width:38px;min-height:38px}
+  .dock button{min-height:40px;min-width:40px}
+  header button{min-height:36px}
+  .chip{padding:8px 13px;font-size:12.5px}
+  .grphead{padding:14px 12px}
+  .layer,.boardrow{padding:9px 8px}
+  .ctxitem{padding:11px 10px;font-size:13.5px}
+  .ctxcolors .cdot{width:28px;height:28px}
+  .cdot{width:30px;height:30px}
+  .cpick{width:34px;height:30px}
+  .sw{width:40px;height:24px}
+  .sw i:before{width:20px;height:20px}
+  .sw input:checked + i:before{transform:translateX(16px)}
+  input[type=range]{height:28px}
+  input[type=range]::-webkit-slider-thumb{width:22px;height:22px;margin-top:-9.5px}
+  input[type=range]::-moz-range-thumb{width:22px;height:22px}
+  .lbtn,.boardrow .ico,.filemore{opacity:.75}
+  .lbtn{min-width:30px;min-height:30px}
+  .libcell span{opacity:1;font-size:9.5px}
+  .libcell:hover{transform:none;box-shadow:none;border-color:var(--line)}
+  .libcell:active{border-color:var(--accent);box-shadow:0 0 0 3px var(--accentSoft)}
+  /* iOS zooms the page into any field under 16px */
+  select,input[type=text],input[type=number],textarea,#libSearch,#homeSearch{font-size:16px}
+}
 </style>
 </head>
 <body>
@@ -323,17 +432,17 @@ kbd{background:var(--sunk);border:1px solid var(--line);border-bottom-width:2px;
   <button id="btnUndo" class="ico" title="Undo — Ctrl Z" data-icon="undo:16"></button>
   <button id="btnRedo" class="ico" title="Redo — Ctrl Shift Z" data-icon="redo:16"></button>
   <div class="sep"></div>
-  <button data-align="l"  class="ico" title="Align left"      data-icon="alignL:16"></button>
-  <button data-align="cx" class="ico" title="Centre across"   data-icon="alignCH:16"></button>
-  <button data-align="r"  class="ico" title="Align right"     data-icon="alignR:16"></button>
-  <button data-align="t"  class="ico" title="Align top"       data-icon="alignT:16"></button>
-  <button data-align="cy" class="ico" title="Centre down"     data-icon="alignCV:16"></button>
-  <button data-align="b"  class="ico" title="Align bottom"    data-icon="alignB:16"></button>
-  <button data-dist="h"   class="ico" title="Distribute horizontally" data-icon="distH:16"></button>
-  <button data-dist="v"   class="ico" title="Distribute vertically"   data-icon="distV:16"></button>
-  <div class="sep"></div>
-  <button id="btnGroup"   class="ico" title="Group (Ctrl G)"   data-icon="group:16"></button>
-  <button id="btnUngroup" class="ico" title="Ungroup (Ctrl Shift G)" data-icon="ungroup:16"></button>
+  <button data-align="l"  class="ico arrange" title="Align left"      data-icon="alignL:16"></button>
+  <button data-align="cx" class="ico arrange" title="Centre across"   data-icon="alignCH:16"></button>
+  <button data-align="r"  class="ico arrange" title="Align right"     data-icon="alignR:16"></button>
+  <button data-align="t"  class="ico arrange" title="Align top"       data-icon="alignT:16"></button>
+  <button data-align="cy" class="ico arrange" title="Centre down"     data-icon="alignCV:16"></button>
+  <button data-align="b"  class="ico arrange" title="Align bottom"    data-icon="alignB:16"></button>
+  <button data-dist="h"   class="ico arrange" title="Distribute horizontally" data-icon="distH:16"></button>
+  <button data-dist="v"   class="ico arrange" title="Distribute vertically"   data-icon="distV:16"></button>
+  <div class="sep arrange"></div>
+  <button id="btnGroup"   class="ico arrange" title="Group (Ctrl G)"   data-icon="group:16"></button>
+  <button id="btnUngroup" class="ico arrange" title="Ungroup (Ctrl Shift G)" data-icon="ungroup:16"></button>
   <div class="grow"></div>
   <button id="btnKeys" class="ico" title="Keyboard shortcuts" data-icon="keyboard:16"></button>
   <button id="themeBtn" class="ico" title="Dark mode"></button>
@@ -346,7 +455,7 @@ kbd{background:var(--sunk);border:1px solid var(--line);border-bottom-width:2px;
 <div id="shell">
 
   <aside id="left">
-    <div class="phead"><span class="ttl grow">Library</span></div>
+    <div class="phead"><span class="ttl grow">Library</span><button class="ico sheetClose" data-close="left" title="Close" data-icon="close:15"></button></div>
     <div class="stylebar"><select id="styleSel"></select></div>
     <div class="searchwrap">
       <span data-icon="search:15"></span>
@@ -357,8 +466,8 @@ kbd{background:var(--sunk);border:1px solid var(--line);border-bottom-width:2px;
 
   <main id="viewport" data-cursor="default">
     <div id="wrap"></div>
-    <button id="toggleLeft" class="panelTab" title="Hide library" data-icon="panelL:15"></button>
-    <button id="toggleRight" class="panelTab" title="Hide properties" data-icon="panelR:15"></button>
+    <button id="toggleLeft" class="panelTab" title="Hide library" data-icon="panelL:15" data-label="Library"></button>
+    <button id="toggleRight" class="panelTab" title="Hide properties" data-icon="panelR:15" data-label="Properties"></button>
     <div class="dock">
       <button data-tool="select" class="ico on" title="Select — V" data-icon="cursor:17"></button>
       <button data-tool="hand"   class="ico" title="Pan — H"      data-icon="hand:17"></button>
@@ -382,6 +491,7 @@ kbd{background:var(--sunk);border:1px solid var(--line);border-bottom-width:2px;
       <span class="lbl">Path</span>
       <button data-opt="smooth" class="on">Smooth</button>
       <button data-opt="closed" class="on">Close</button>
+      <button id="penDone" class="solid">Done</button>
     </div>
     <div id="nodeHint" class="hintpill">Editing points — drag to move, Alt-click to remove, Esc to finish</div>
   </main>
@@ -391,6 +501,7 @@ kbd{background:var(--sunk);border:1px solid var(--line);border-bottom-width:2px;
       <span class="ttl grow">Palette</span>
       <button id="btnRecolour" class="ico" title="Put every layer back on the palette (shift-click to reshuffle)" data-icon="palette:15"></button>
       <button id="btnPalRand" class="ico" title="Invent a palette" data-icon="sparkle:15"></button>
+      <button class="ico sheetClose" data-close="right" title="Close" data-icon="close:15"></button>
     </div>
     <div class="palbox"><div id="pals"></div></div>
     <div id="brandbar" class="brandbar"></div>
@@ -402,6 +513,7 @@ kbd{background:var(--sunk);border:1px solid var(--line);border-bottom-width:2px;
     </div>
   </aside>
 
+  <div id="scrim"></div>
 </div>
 
 <div id="ctxmenu"></div>
