@@ -3,248 +3,132 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Scrawl · Indian folk art, drawn from the rules up</title>
-<meta name="description" content="Scrawl is a design studio for Warli, Gond, Madhubani, Pattachitra, Kalamkari and sketchbook art. Every mark is generated live, and everything exports as clean vector.">
-<meta property="og:title" content="Scrawl · Indian folk art, drawn from the rules up">
-<meta property="og:description" content="A design studio for Indian folk art traditions. Every mark is generated. Nothing is clip art.">
-<meta name="theme-color" content="#F7F5F0">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23141312'/%3E%3Ccircle cx='16' cy='8' r='3.2' fill='%23F7F5F0'/%3E%3Cpath d='M9.5 12h13L16 18.5zM16 18.5l-6.5 7h13z' fill='%23F7F5F0'/%3E%3C/svg%3E">
+<title>Scrawl · An exhibition that draws itself</title>
+<meta name="description" content="Six traditions of Indian folk art, drawn live by their own rules. Warli, Gond, Madhubani, Pattachitra, Kalamkari and the sketchbook, in one studio that runs in your browser.">
+<meta property="og:title" content="Scrawl · An exhibition that draws itself">
+<meta property="og:description" content="One peacock. Six rulebooks. Indian folk art, drawn live by code.">
+<meta name="theme-color" content="#EEE8DC">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23121110'/%3E%3Ccircle cx='16' cy='8' r='3.2' fill='%23EEE8DC'/%3E%3Cpath d='M9.5 12h13L16 18.5zM16 18.5l-6.5 7h13z' fill='%23EEE8DC'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <!-- faces the templates themselves use; not needed for first paint -->
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&family=Bebas+Neue&family=Anton&family=Archivo+Black&family=Caveat:wght@700&family=Chivo+Mono:wght@500&family=Alfa+Slab+One&family=Bricolage+Grotesque:wght@700&family=Space+Grotesk:wght@600&family=Syne:wght@700&family=Unbounded:wght@700&family=Playfair+Display:wght@700&family=Fraunces:wght@600&family=Cormorant+Garamond:wght@600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <link rel="stylesheet" href="site.css">
 </head>
 <body>
-<a class="skip" href="#main">Skip to content</a>
+<a class="skip" href="#rooms">Skip to the exhibition</a>
 
+<!-- ============ NAV: the floor plan ============ -->
 <header class="nav" id="nav">
-  <div class="nav-in">
-    <a class="brand" href="#top" aria-label="Scrawl home">
-      <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9"/><circle cx="16" cy="8" r="3.2"/><path d="M9.5 12h13L16 18.5zM16 18.5l-6.5 7h13z"/></svg>
-      <span>Scrawl</span>
-    </a>
-    <nav class="nav-links" id="navLinks" aria-label="Main">
-      <a href="#traditions">Traditions</a>
-      <a href="#how">How it works</a>
-      <a href="#templates">Templates</a>
-      <a href="#pricing">Pricing</a>
-      <a href="https://github.com/Uttambakori/scrawl">GitHub</a>
-    </nav>
-    <div class="nav-cta">
-      <a class="btn btn--quiet hide-sm" href="#pricing">Get Pro</a>
-      <a class="btn btn--dark" data-editor href="../index.html">Open editor</a>
-      <button class="nav-menu" id="navMenu" aria-label="Menu" aria-expanded="false" aria-controls="navLinks"><span></span><span></span></button>
-    </div>
-  </div>
+  <a class="mark" href="#top" aria-label="Scrawl, back to the opening">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="7.5" r="3.4"/><path d="M8.5 12h15L16 19zM16 19l-7.5 8h15z"/></svg>
+    <span>Scrawl</span>
+  </a>
+  <nav class="plan" id="plan" aria-label="Floor plan"></nav>
+  <details class="plan-sm" id="planSm">
+    <summary><span id="planNow">Opening</span><i aria-hidden="true"></i></summary>
+    <div class="plan-sheet" id="planSheet"></div>
+  </details>
+  <a class="nav-cta" data-editor href="../index.html">Open studio <span aria-hidden="true">↗</span></a>
 </header>
 
-<main id="main">
+<main>
 
-  <!-- ============ HERO ============ -->
-  <section class="hero" id="top">
-    <div class="wrap hero-copy">
-      <a class="eyebrow" href="#traditions"><span class="eyebrow-dot"></span><span id="eyebrow">Six traditions, one studio</span><span aria-hidden="true">→</span></a>
-      <h1 class="h-hero">Indian folk art,<br>drawn from the rules up.</h1>
-      <p class="lede" id="heroLede">Scrawl is a design studio for Indian folk art. Every mark is generated from the rules of the tradition, so no two drawings are the same, and everything exports as clean vector.</p>
-      <div class="cta-row">
-        <a class="btn btn--dark btn--lg" data-editor href="../index.html">Start drawing free</a>
-        <a class="btn btn--line btn--lg" href="#pricing">See pricing</a>
-      </div>
-      <p class="fine">Free forever. No account, no install.</p>
-    </div>
-
-    <!-- A working miniature of the editor -->
-    <div class="wrap wrap--wide">
-      <div class="app" id="app" aria-label="Live demo of the Scrawl editor">
-        <div class="app-bar">
-          <span class="app-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="16" cy="8" r="3.2"/><path d="M9.5 12h13L16 18.5zM16 18.5l-6.5 7h13z"/></svg></span>
-          <p class="app-file"><span id="appTradName">Warli</span><span class="sl">/</span><b id="appFile">Village wall</b></p>
-          <div class="app-bar-r">
-            <span class="app-live"><i></i>Live</span>
-            <a class="app-open" data-editor href="../index.html">Open in editor</a>
-          </div>
-        </div>
-        <div class="app-body">
-          <aside class="app-left">
-            <p class="app-label">Traditions</p>
-            <div class="app-trads" id="appTrads" role="tablist" aria-label="Tradition"></div>
-            <p class="app-label app-label--tpl">Templates</p>
-            <div class="app-tpls" id="appTpls" role="listbox" aria-label="Template"></div>
-          </aside>
-          <div class="app-canvas" id="appCanvas">
-            <div class="board" id="board">
-              <span class="board-label" id="boardLabel"></span>
-              <div class="board-art" id="boardArt"></div>
-            </div>
-          </div>
-          <aside class="app-right">
-            <div class="insp">
-              <p class="app-label">Palette</p>
-              <div class="pals" id="appPals" role="radiogroup" aria-label="Palette"></div>
-              <p class="insp-sub" id="palName"></p>
-            </div>
-            <div class="insp">
-              <p class="app-label">Hand</p>
-              <label class="range"><span>Wobble</span><input type="range" id="appWobble" min="0" max="1.6" step="0.01"><output id="appWobbleOut"></output></label>
-            </div>
-            <div class="insp">
-              <p class="app-label">Seed</p>
-              <div class="seed-row"><code id="appSeed">0000</code><button class="btn btn--sm btn--dark" id="appShuffle">Shuffle</button></div>
-            </div>
-            <div class="insp insp--note">
-              <p class="app-label">The rule</p>
-              <p class="insp-note" id="appNote"></p>
-            </div>
-          </aside>
-        </div>
-      </div>
-      <p class="app-caption">This is the real engine, running on this page. Pick a tradition, change the palette or shuffle the seed.</p>
-    </div>
-  </section>
-
-  <!-- ============ PROOF STRIP ============ -->
-  <section class="stats" aria-label="Scrawl in numbers">
-    <div class="wrap stats-in" id="stats"></div>
-  </section>
-
-  <!-- ============ TRADITIONS ============ -->
-  <section class="section" id="traditions">
-    <div class="wrap">
-      <header class="sec-head">
-        <p class="kicker">Traditions</p>
-        <h2 class="h-sec" id="tradTitle">Six traditions. Each with its own rules.</h2>
-        <p class="sec-lede">A tradition in Scrawl is not a sticker pack. It is a discipline: the grounds and pigments artists actually used, how the brush moves, and how a shape gets filled. Click a drawing to redraw it.</p>
-      </header>
-      <div class="trad-grid" id="tradGrid"></div>
-    </div>
-  </section>
-
-  <!-- ============ LIBRARY ============ -->
-  <section class="library" aria-labelledby="libTitle">
-    <div class="wrap lib-head">
-      <h2 class="h-sec" id="libTitle">A library that draws itself.</h2>
-      <p class="sec-lede" id="libLede">Every piece is a small program, not a picture. Change a dial or a seed and it draws again, in the same hand.</p>
-    </div>
-    <div class="marquee" id="marquee" aria-hidden="true"></div>
-  </section>
-
-  <!-- ============ HOW IT WORKS ============ -->
-  <section class="section" id="how">
-    <div class="wrap">
-      <header class="sec-head">
-        <p class="kicker">How it works</p>
-        <h2 class="h-sec">From a blank page to print in three steps.</h2>
-      </header>
-      <ol class="steps">
-        <li class="step">
-          <div class="step-vis step-vis--trads" id="stepTrads"></div>
-          <p class="step-n">01</p>
-          <h3>Pick a tradition</h3>
-          <p>Every tradition sets its own ground, pigments and brush. Switch it and the whole page follows.</p>
-        </li>
-        <li class="step">
-          <div class="step-vis step-vis--seed" id="stepSeed" role="button" tabindex="0" aria-label="Shuffle this drawing"></div>
-          <p class="step-n">02</p>
-          <h3>Make it yours</h3>
-          <p>Drop in pieces, shuffle the seed, turn the dials. The same seed always gives the same drawing. <button class="link" id="stepShuffle">Try a new seed</button></p>
-        </li>
-        <li class="step">
-          <div class="step-vis step-vis--export" id="stepExport"></div>
-          <p class="step-n">03</p>
-          <h3>Export anywhere</h3>
-          <p>PNG, JPG and WebP on every plan. Pro adds SVG, 4× and print PDF with bleed and crop marks.</p>
-        </li>
-      </ol>
-    </div>
-  </section>
-
-  <!-- ============ TEMPLATES ============ -->
-  <section class="section section--tint" id="templates">
-    <div class="wrap">
-      <header class="sec-head sec-head--row">
-        <div>
-          <p class="kicker">Templates</p>
-          <h2 class="h-sec" id="tplTitle">Start from a finished design.</h2>
-        </div>
-        <div class="chips" id="tplFilter" role="tablist" aria-label="Filter templates"></div>
-      </header>
-    </div>
-    <div class="tpl-rail" id="tplRail" tabindex="0" aria-label="Templates"></div>
-    <div class="wrap tpl-nav">
-      <button class="round" id="tplPrev" aria-label="Previous templates">←</button>
-      <button class="round" id="tplNext" aria-label="Next templates">→</button>
-    </div>
-  </section>
-
-  <!-- ============ FEATURES ============ -->
-  <section class="section" id="features">
-    <div class="wrap">
-      <header class="sec-head">
-        <p class="kicker">Built properly</p>
-        <h2 class="h-sec">Made for work that ships.</h2>
-      </header>
-      <div class="feats" id="feats"></div>
-    </div>
-  </section>
-
-  <!-- ============ PRICING ============ -->
-  <section class="section section--dark" id="pricing">
-    <div class="wrap">
-      <header class="sec-head sec-head--center">
-        <p class="kicker">Pricing</p>
-        <h2 class="h-sec">Start free. Upgrade when it's work.</h2>
-        <p class="sec-lede">Free covers everything you need to make the work. Pro is for getting it out into the world.</p>
-        <p class="beta-note" id="planBeta"><span class="eyebrow-dot"></span>Scrawl is in beta, so every Pro feature is free until launch.</p>
-      </header>
-      <div class="plans" id="plans"></div>
-      <details class="compare">
-        <summary><span>Compare every feature</span><i aria-hidden="true"></i></summary>
-        <div class="compare-scroll"><table id="compare"></table></div>
-      </details>
-    </div>
-  </section>
-
-  <!-- ============ FAQ ============ -->
-  <section class="section" id="faq">
-    <div class="wrap faq-wrap">
-      <header class="sec-head">
-        <p class="kicker">Questions</p>
-        <h2 class="h-sec">Good to know.</h2>
-      </header>
-      <div class="faq" id="faqList"></div>
-    </div>
-  </section>
-
-  <!-- ============ CLOSE ============ -->
-  <section class="close">
-    <div class="wrap close-in">
-      <div class="close-art" id="closeArt" aria-hidden="true"></div>
-      <div class="close-copy">
-        <h2 class="h-sec">Make something that looks hand-made.</h2>
-        <p class="sec-lede">Open the editor and draw your first wall in under a minute.</p>
-        <div class="cta-row">
-          <a class="btn btn--dark btn--lg" data-editor href="../index.html">Start drawing free</a>
-          <a class="btn btn--line btn--lg" href="#pricing">See pricing</a>
-        </div>
+  <!-- ============ OPENING ============ -->
+  <section class="opening" id="top" data-room="Opening">
+    <div class="op-copy">
+      <p class="cat">Scrawl <span>/</span> An exhibition that draws itself</p>
+      <h1 class="op-title"><span class="line fitw"><span>One peacock.</span></span><span class="line fitw"><span id="opCount">Six rulebooks.</span></span></h1>
+      <p class="op-now" aria-live="polite">Now drawn by the rules of <b id="opName">Warli</b>, <span id="opWhere">Maharashtra</span>.</p>
+      <p class="op-rule" id="opRule"></p>
+      <div class="op-cta">
+        <a class="btn btn--solid" data-editor href="../index.html">Open the studio, it's free</a>
+        <a class="btn btn--line" href="#rooms">Enter the exhibition ↓</a>
       </div>
     </div>
+    <figure class="op-art">
+      <div class="op-piece" id="opArt"></div>
+      <figcaption class="op-cap" id="opCap"></figcaption>
+    </figure>
+    <ol class="op-stops" id="opStops" aria-label="Traditions"></ol>
+  </section>
+
+  <!-- ============ THE ROOMS (built from the loaded traditions) ============ -->
+  <div id="rooms"></div>
+
+  <!-- ============ STUDIO ============ -->
+  <section class="room room--studio" id="studio" data-room="Studio">
+    <header class="studio-head">
+      <p class="cat"><span class="rn" id="studioNo">07</span> The studio</p>
+      <h2 class="mega fitw"><span>Now draw your own</span></h2>
+      <p class="studio-lede">This is the real editor, running on this page. Pick a tradition, change the palette or shuffle the seed. The full studio adds layers, type, templates and export.</p>
+    </header>
+    <div class="app" id="app" aria-label="Live demo of the Scrawl editor">
+      <div class="app-bar">
+        <span class="app-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="16" cy="7.5" r="3.4"/><path d="M8.5 12h15L16 19zM16 19l-7.5 8h15z"/></svg></span>
+        <p class="app-file"><span id="appTradName">Warli</span><span class="sl">/</span><b id="appFile">Village wall</b></p>
+        <div class="app-bar-r"><span class="app-live"><i></i>Live</span><a class="app-open" data-editor href="../index.html">Open full studio</a></div>
+      </div>
+      <div class="app-body">
+        <aside class="app-left">
+          <p class="app-label">Traditions</p>
+          <div class="app-trads" id="appTrads" role="tablist" aria-label="Tradition"></div>
+          <p class="app-label app-label--tpl">Templates</p>
+          <div class="app-tpls" id="appTpls" role="listbox" aria-label="Template"></div>
+        </aside>
+        <div class="app-canvas" id="appCanvas">
+          <div class="board" id="board"><span class="board-label" id="boardLabel"></span><div class="board-art" id="boardArt"></div></div>
+        </div>
+        <aside class="app-right">
+          <div class="insp"><p class="app-label">Palette</p><div class="pals" id="appPals" role="radiogroup" aria-label="Palette"></div><p class="insp-sub" id="palName"></p></div>
+          <div class="insp"><p class="app-label">Hand</p><label class="range"><span>Wobble</span><input type="range" id="appWobble" min="0" max="1.6" step="0.01"><output id="appWobbleOut"></output></label></div>
+          <div class="insp"><p class="app-label">Seed</p><div class="seed-row"><code id="appSeed">0</code><button class="btn btn--sm" id="appShuffle">Shuffle</button></div></div>
+          <div class="insp insp--note"><p class="app-label">The rule</p><p class="insp-note" id="appNote"></p></div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ADMISSION ============ -->
+  <section class="room room--admission" id="admission" data-room="Admission">
+    <header class="adm-head">
+      <p class="cat"><span class="rn" id="admNo">08</span> Admission</p>
+      <h2 class="mega fitw"><span>Admission</span></h2>
+      <p class="adm-lede">Free covers everything you need to make the work. Pro is for getting it out into the world.</p>
+    </header>
+    <div class="tickets" id="tickets"></div>
+    <details class="compare">
+      <summary>Compare every feature</summary>
+      <div class="compare-scroll"><table id="compare"></table></div>
+    </details>
+  </section>
+
+  <!-- ============ VISITOR INFORMATION ============ -->
+  <section class="info" id="info" data-room="Visitor information">
+    <header class="info-head">
+      <p class="cat">Visitor information</p>
+      <h2 class="info-title">Good to know before you go in.</h2>
+    </header>
+    <div class="faq" id="faqList"></div>
+  </section>
+
+  <!-- ============ EXIT ============ -->
+  <section class="exit" id="exit" data-room="Exit">
+    <a class="exit-link" data-editor href="../index.html">
+      <span class="cat">Exit through the studio</span>
+      <span class="mega fitw"><span>Start drawing ↗</span></span>
+    </a>
+    <div class="exit-band" id="exitBand" aria-hidden="true"></div>
   </section>
 </main>
 
 <footer class="foot">
-  <div class="wrap foot-in">
-    <div class="foot-brand">
-      <a class="brand" href="#top"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9"/><circle cx="16" cy="8" r="3.2"/><path d="M9.5 12h13L16 18.5zM16 18.5l-6.5 7h13z"/></svg><span>Scrawl</span></a>
-      <p>Scrawl draws from the rules of living art traditions, each one made and kept alive by communities of artists across India. If you love the look, find and buy work from the artists themselves.</p>
-    </div>
-    <nav class="foot-cols" aria-label="Footer">
-      <div><p>Product</p><a data-editor href="../index.html">Editor</a><a href="#traditions">Traditions</a><a href="#templates">Templates</a><a href="#pricing">Pricing</a></div>
-      <div><p>Project</p><a href="https://github.com/Uttambakori/scrawl">GitHub</a><a href="#faq">Questions</a></div>
-    </nav>
-  </div>
-  <div class="wrap foot-base"><span>© <span id="year">2026</span> Scrawl</span><span>Every drawing on this page was generated live.</span></div>
+  <p class="foot-note">Scrawl draws from the rules of living art traditions, each one made and kept alive by communities of artists across India. If you love the look, find and buy work from the artists themselves.</p>
+  <nav class="foot-links" aria-label="Footer">
+    <a data-editor href="../index.html">Studio</a><a href="#rooms">Exhibition</a><a href="#admission">Admission</a><a href="https://github.com/Uttambakori/scrawl">GitHub</a>
+  </nav>
+  <p class="foot-base"><span>© <span id="year">2026</span> Scrawl</span><span>Every drawing on this page was generated live.</span></p>
 </footer>
 
 <!-- The editor's own engine and packs, loaded in the order the editor

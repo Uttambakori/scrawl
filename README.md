@@ -347,7 +347,7 @@ Traditions, palettes, piece counts and templates all come from the loaded
 packs, so a tradition added to the editor appears on the site with no change
 to `site/`. Everything else worth changing without reading the code is in
 `CONFIG` at the top of `site/site.js`: the editor link, the optional
-per-tradition picks (palette, hero template, showcase pieces) and the plan
+per-tradition picks (the palette its room is painted in, the piece drawn in the opening, the rule its room is built on) and the plan
 fallback. Pricing is read from the editor's `plan.js` when it is present, so
 prices, Pro features and checkout links are set in one place.
 
