@@ -340,36 +340,46 @@ Nothing runs server-side and nothing leaves the browser.
 
 ## The website
 
-`site/` is Scrawl's marketing page: plain HTML, one stylesheet, one small
-script and one self-hosted variable font (Anybody, SIL Open Font License, in
-`site/fonts/`). The motion is CSS transforms and opacity only. Loops pause
-when they scroll out of view, stop on machines with two cores or less (or
-with Save-Data on), and everything holds still for visitors who ask for
-reduced motion.
+`site/` is Scrawl's marketing page, built as a painted desktop: an indigo
+wall with windows outlined by hand. On a big screen the windows can be
+dragged by their bars, rolled up, closed and reopened from the desktop icons
+or the menus. Scrawl Paint is the main window, where the peacocks draw
+themselves. On a phone, or before the script runs, the same windows stack
+into one plain column.
+
+It is plain HTML, one stylesheet, one small script and one self-hosted
+variable font (Shantell Sans, SIL Open Font License, in `site/fonts/`).
+Motion is CSS transforms and opacity only. It switches off on machines with
+two cores or less (or with Save-Data on), and everything holds still for
+visitors who ask for reduced motion.
 
 Every picture is drawn by the editor's own generators, once, ahead of time.
 `site/build.js` loads the engine and packs in Node (in the order the editor's
 `index.html` lists them) and writes to `site/art/`:
 
 - `draw-<tradition>.svg`, a peacock in each tradition whose strokes draw
-  themselves on in the hero and the rulebooks;
-- `made-<name>.webp`, eight finished templates (invite, album, tote and so
-  on), rasterised with Playwright when it is installed;
-- `chain.svg`, the Warli dancers along the footer.
+  themselves on in Scrawl Paint;
+- `made-<name>.webp` and `thumb-<name>.webp`, eight finished templates for
+  the Gallery;
+- `icon-<name>.webp` and `tool-<tradition>.webp`, the desktop icons and
+  Paint's tools, each one a motif;
+- `wall.svg`, the Warli ring painted on the desktop.
 
-It also fills the rulebook rows, the hero sequence and the library counts in
+The WebP files are rasterised with Playwright when it is installed. It also
+fills the Rulebooks, Paint's tradition data and the library counts in
 `site/index.html`. After adding or changing a tradition, run:
 
     node site/build.js
 
-and commit what it changes. A new tradition gets a rulebook row with no other
-edit; its palette, peacock and one-line rule can be set in `TRAD` at the top
-of `build.js`.
+and commit what it changes. A new tradition gets a rulebook and a Paint tool
+with no other edit; its palette, peacock and one-line rule can be set in
+`TRAD` at the top of `build.js`.
 
-Only the "Shuffle the hand" demo runs the real engine, and it loads it when a
-visitor scrolls near. Prices are written in the page and mirror `plan.js`;
-when checkout pages exist, put them in `CONFIG.checkout` in `site/site.js` and
-the Pro buttons switch from "Free during beta" to buying.
+Scrawl Paint loads the real engine only when a visitor first changes a
+palette, a template or the shuffle. Prices are written in the page and mirror
+`plan.js`; when checkout pages exist, put them in `CONFIG.checkout` in
+`site/site.js` and the Register button switches from the beta offer to
+buying.
 
 Serve the repository root (for GitHub Pages: deploy from the `main` branch,
 root folder) and open `/site/`. Its "Open the editor" links point at `../index.html`.

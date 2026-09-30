@@ -15,12 +15,14 @@
    What it draws:
      draw-<tradition>.svg  the peacock each tradition stands for,
                            marked up to draw itself line by line
-     made-<name>.svg       finished templates for the "made in an
-                           afternoon" wall
-     chain.svg             the Warli chain that walks along the foot
+     made-<name>.webp      finished templates for the Gallery folder
+     thumb-<name>.webp     the same, small, for the folder's icons
+     icon-<name>.svg       the desktop icons, each one a motif
+     tool-<tradition>.svg  the tool buttons in Scrawl Paint
+     wall.svg              the Warli ring painted on the desktop
 
-   Only the "Shuffle the hand" demo loads the real engine, and only
-   when a visitor scrolls near it.
+   Only Scrawl Paint's shuffle and templates load the real engine,
+   and only when a visitor first uses them.
    ============================================================ */
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..'), OUT = path.join(__dirname, 'art');
@@ -41,7 +43,7 @@ vm.runInContext(fs.readFileSync(path.join(__dirname, 'render.js'), 'utf8'), ctx,
 const S = ctx.SCRAWL, R = ctx.SITE;
 
 /* ---- the site's own colours (see :root in site.css) ---- */
-const C = { night: '#0E0D0B', bone: '#F3EDE2', sindoor: '#FF5A1F', turmeric: '#F2B233' };
+const C = { ink: '#1B1612', paper: '#FBF3E4', indigo: '#1F2A6B', sindoor: '#D9411E', turmeric: '#F0B429' };
 
 /* ---- per tradition: palette, the peacock that stands for it, its rule ---- */
 const TRAD = {
@@ -101,7 +103,9 @@ const trads = keys.map(k => {
   const label = `${p.name}, drawn by Scrawl in the ${st.name} style`;
   W(`draw-${k}.svg`, 600, 600, m.body, { defs: m.defs, label });
   return {
-    k, name: st.name, where: st.where || t.medium || '', medium: t.medium || '', label,
+    k, name: st.name, peacock: p.name, pal: t.pal || 0,
+    pals: S.stylePalettes(k).map((q, i) => [i, q[0], q[1], q[2], q[3]]).slice(0, 10),
+    tpls: S.TEMPLATES.filter(x => (x.style || 'sketch') === k && (x.items || []).length).map(x => x.name), where: st.where || t.medium || '', medium: t.medium || '', label,
     rule: t.rule || String(st.note || '').split(/(?<=\.)\s/)[0],
     ground: pal.paper, ink: pal.colors[0], accent: pal.colors[1],
     motifs: R.presetsOf(k).length, palettes: S.stylePalettes(k).length,
@@ -141,8 +145,8 @@ const madeDone = (async () => {
   if (!pw) { console.warn('Playwright not found: kept the existing made-*.webp images'); return; }
   const browser = await pw.chromium.launch();
   const page = await browser.newPage();
-  for (const m of made) {
-    const width = 720, height = Math.round(width * m.h / m.w);
+  for (const m of made) for (const [pre, width] of [['made', 720], ['thumb', 200]]) {
+    const height = Math.round(width * m.h / m.w);
     const data = await page.evaluate(async ({ svg, width, height }) => {
       const img = new Image();
       img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
@@ -152,35 +156,65 @@ const madeDone = (async () => {
       return c.toDataURL('image/webp', .8);
     }, { svg: m.svg, width, height });
     const buf = Buffer.from(data.split(',')[1], 'base64');
-    fs.writeFileSync(path.join(OUT, `made-${m.name}.webp`), buf);
-    sizes[`made-${m.name}.webp`] = buf.length;
+    fs.writeFileSync(path.join(OUT, `${pre}-${m.name}.webp`), buf);
+    sizes[`${pre}-${m.name}.webp`] = buf.length;
+  }
+  for (const r of rasters) {
+    const data = await page.evaluate(async ({ svg, px }) => {
+      const img = new Image();
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+      await img.decode();
+      const c = document.createElement('canvas'); c.width = px; c.height = px;
+      c.getContext('2d').drawImage(img, 0, 0, px, px);
+      return c.toDataURL('image/webp', .9);
+    }, r);
+    const buf = Buffer.from(data.split(',')[1], 'base64');
+    fs.writeFileSync(path.join(OUT, `${r.name}.webp`), buf);
+    sizes[`${r.name}.webp`] = buf.length;
   }
   await browser.close();
 })();
 
-/* ---------- the chain: walks along the foot of the page ---------- */
+/* ---------- the desktop: its icons, Paint's tools, the wall ----------
+   Icons are drawn in rice-paste white on the indigo desktop, the way
+   Warli is painted on a wall; tools are drawn in ink on paper. */
+const ICONS = {
+  paint: ['Peacock', 'warli'], gallery: ['Fish', 'madhubani'], rules: ['Konark wheel', 'pattachitra'],
+  register: ['Paisley', 'kalamkari'], help: ['Owl', 'gond'], trash: ['Loose scribble', 'sketch'],
+};
+/* the finest of these hold thousands of marks, far too many for a 60px
+   icon, so they are rasterised with the gallery pieces below */
+const rasters = [];
+const raster = (name, w, h, m, px) => rasters.push({ name, w, h, px, svg: fmt(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">${m.defs ? `<defs>${m.defs}</defs>` : ''}${m.body}</svg>`) });
+for (const [name, [p, st]] of Object.entries(ICONS)) {
+  const m = compose([{ pre: pre(p, st), box: { x: 6, y: 6, w: 108, h: 108 } }], [C.paper, C.turmeric, C.paper, C.paper, C.indigo], { detail: .6 });
+  raster(`icon-${name}`, 120, 120, m, 120);
+}
+const TOOLS = { warli: 'Standing', gond: 'Dotted bird', madhubani: 'Fish', pattachitra: 'Lotus', kalamkari: 'Paisley', sketch: 'Spiral' };
+for (const k of keys) {
+  const p = R.findPreset(TOOLS[k] || '', k) || R.presetsOf(k).find(isSquare);
+  const m = compose([{ pre: p, box: { x: 4, y: 4, w: 72, h: 72 } }], [C.ink, C.sindoor, C.ink, C.ink, C.paper], { detail: .5 });
+  raster(`tool-${k}`, 80, 80, m, 96);
+}
 {
-  const m = compose([{ pre: pre('Long chain', 'warli'), box: { x: 0, y: 0, w: 2400, h: 200 } }], [C.bone, C.sindoor, C.bone, C.bone, C.night]);
-  W('chain.svg', 2400, 200, m.body, { defs: m.defs });
+  const m = compose([{ pre: pre('Tarpa dance', 'warli'), box: { x: 0, y: 0, w: 900, h: 900 } }], [C.paper, C.paper, C.paper, C.paper, C.indigo], { detail: .7 });
+  W('wall.svg', 900, 900, m.body, { defs: m.defs });
 }
 
 /* ---------- the tradition index ---------- */
 const two = n => String(n).padStart(2, '0');
-const rows = trads.map((t, i) => `        <li class="rb" style="--tg:${t.ground};--tf:${t.ink};--ta:${t.accent}" data-k="${t.k}" data-label="${esc(t.label)}">
-          <button class="rb-head" type="button" aria-expanded="${i === 0}" aria-controls="rb-${t.k}">
-            <span class="rb-no">${two(i + 1)}</span>
-            <span class="rb-name">${esc(t.name)}</span>
-            <span class="rb-where">${esc(t.where)}</span>
-          </button>
-          <div class="rb-body" id="rb-${t.k}">
-            <p class="rb-rule">${esc(t.rule)}</p>
-            <p class="rb-meta">${t.motifs} motifs · ${t.palettes} palettes · ${t.templates} templates</p>
-            <div class="rb-art" aria-hidden="true"></div>
-          </div>
-        </li>`).join('\n');
+const rows = trads.map((t, i) => `            <li class="rule" style="--tg:${t.ground};--tf:${t.ink};--ta:${t.accent}">
+              <span class="rule-no mono">${two(i + 1)}</span>
+              <img class="rule-ico" src="art/tool-${t.k}.webp" alt="" width="44" height="44">
+              <div>
+                <h3 class="rule-name">${esc(t.name)} <span class="rule-where">${esc(t.where)}</span></h3>
+                <p class="rule-line">“${esc(t.rule)}”</p>
+                <p class="rule-meta mono">${t.motifs} motifs · ${t.palettes} palettes · ${t.templates} templates</p>
+              </div>
+            </li>`).join('\n');
 
 /* the hero's sequence, as data the page script reads */
-const seq = trads.map(t => ({ k: t.k, name: t.name, where: t.where, rule: t.rule, g: t.ground, f: t.ink, a: t.accent, label: t.label }));
+const seq = trads.map(t => ({ k: t.k, name: t.name, where: t.where, rule: t.rule, g: t.ground, f: t.ink, a: t.accent, label: t.label, peacock: t.peacock, pal: t.pal, pals: t.pals, tpls: t.tpls }));
 
 /* ---------- write the index, the sequence and the counts into the page ---------- */
 const counts = {
