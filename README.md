@@ -341,24 +341,32 @@ Nothing runs server-side and nothing leaves the browser.
 ## The website
 
 `site/` is Scrawl's marketing page: plain HTML, one stylesheet, one small
-script and one self-hosted font (Bricolage Grotesque, SIL Open Font License,
-in `site/fonts/`). It is built to stay quick on old laptops: nothing on it
-moves unless you touch it, and it does not run the drawing engine to show its
-pictures.
+script and one self-hosted variable font (Anybody, SIL Open Font License, in
+`site/fonts/`). The motion is CSS transforms and opacity only. Loops pause
+when they scroll out of view, stop on machines with two cores or less (or
+with Save-Data on), and everything holds still for visitors who ask for
+reduced motion.
 
-Every picture is still drawn by the editor's own generators, just once, ahead
-of time. `site/build.js` loads the engine and packs in Node (in the order the
-editor's `index.html` lists them), writes the drawings to `site/art/` as SVG
-files, and fills the tradition cards and library counts in `site/index.html`.
-After adding or changing a tradition, run:
+Every picture is drawn by the editor's own generators, once, ahead of time.
+`site/build.js` loads the engine and packs in Node (in the order the editor's
+`index.html` lists them) and writes to `site/art/`:
+
+- `draw-<tradition>.svg`, a peacock in each tradition whose strokes draw
+  themselves on in the hero and the rulebooks;
+- `made-<name>.webp`, eight finished templates (invite, album, tote and so
+  on), rasterised with Playwright when it is installed;
+- `chain.svg`, the Warli dancers along the footer.
+
+It also fills the rulebook rows, the hero sequence and the library counts in
+`site/index.html`. After adding or changing a tradition, run:
 
     node site/build.js
 
-and commit what it changes. A new tradition gets a card with no other edit;
-its palette, peacock and one-line rule can be set in `TRAD` at the top of
-`build.js`.
+and commit what it changes. A new tradition gets a rulebook row with no other
+edit; its palette, peacock and one-line rule can be set in `TRAD` at the top
+of `build.js`.
 
-Only the "Have a go" demo runs the real engine, and it loads it when a
+Only the "Shuffle the hand" demo runs the real engine, and it loads it when a
 visitor scrolls near. Prices are written in the page and mirror `plan.js`;
 when checkout pages exist, put them in `CONFIG.checkout` in `site/site.js` and
 the Pro buttons switch from "Free during beta" to buying.

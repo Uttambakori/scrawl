@@ -7,13 +7,20 @@
    parse half a megabyte of generators before seeing a peacock.
    Instead this script runs the editor's own generators here, in
    Node, and writes plain SVG files into site/art/. It also fills
-   the tradition cards and the library counts in site/index.html.
+   the tradition index and the library counts in site/index.html.
 
    Run it after adding or changing a tradition:
        node site/build.js
 
-   Only the "Have a go" demo loads the real engine, and only when
-   a visitor scrolls near it.
+   What it draws:
+     draw-<tradition>.svg  the peacock each tradition stands for,
+                           marked up to draw itself line by line
+     made-<name>.svg       finished templates for the "made in an
+                           afternoon" wall
+     chain.svg             the Warli chain that walks along the foot
+
+   Only the "Shuffle the hand" demo loads the real engine, and only
+   when a visitor scrolls near it.
    ============================================================ */
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..'), OUT = path.join(__dirname, 'art');
@@ -34,7 +41,7 @@ vm.runInContext(fs.readFileSync(path.join(__dirname, 'render.js'), 'utf8'), ctx,
 const S = ctx.SCRAWL, R = ctx.SITE;
 
 /* ---- the site's own colours (see :root in site.css) ---- */
-const C = { paper: '#FBF6EE', sand: '#F3E8D8', ink: '#22160F', geru: '#A63D1E', turmeric: '#F2B233' };
+const C = { night: '#0E0D0B', bone: '#F3EDE2', sindoor: '#FF5A1F', turmeric: '#F2B233' };
 
 /* ---- per tradition: palette, the peacock that stands for it, its rule ---- */
 const TRAD = {
@@ -79,65 +86,103 @@ function compose(items, colors, o) {
 }
 
 fs.mkdirSync(OUT, { recursive: true });
+for (const f of fs.readdirSync(OUT)) if (f.endsWith('.svg')) fs.unlinkSync(path.join(OUT, f));
 const sizes = {};
 const W = (name, ...a) => { sizes[name] = file(name, ...a); };
-
-/* ---------- the hero: a tarpa dance on a red-earth wall ---------- */
-{
-  const onEarth = [C.paper, C.turmeric, C.paper, C.paper, C.geru];
-  const ring = compose([{ pre: pre('Tarpa dance', 'warli'), box: { x: 0, y: 0, w: 800, h: 800 }, o: { weight: 4.2 } }], onEarth);
-  W('ring.svg', 800, 800, ring.body, { defs: ring.defs, label: 'A Warli tarpa dance: figures holding hands in a ring around a musician playing the tarpa' });
-  const ground = compose([{ pre: pre('Triangle border', 'warli'), box: { x: 0, y: 0, w: 2400, h: 70 } }], onEarth);
-  W('ground.svg', 2400, 70, ground.body, { defs: ground.defs });
-}
-
-/* ---------- the crew: Scrawl's Warli mascots, for the makers' note ---------- */
-{
-  const poses = ['Waving', 'Drummer', 'Dancing', 'Water carrier', 'Tarpa player', 'Leaping', 'Dancer with knot', 'Archer', 'Pointing'];
-  const w = 1800, step = w / poses.length, h = step;
-  const items = poses.map((n, i) => ({ pre: pre(n, 'warli'), box: { x: i * step + 4, y: 4, w: step - 8, h: step - 8 } }));
-  const m = compose(items, [C.ink, C.geru, C.ink, C.ink, C.paper]);
-  W('crew.svg', w, h, m.body, { defs: m.defs, label: 'Nine Warli figures in a row: waving, drumming, dancing, carrying water, playing the tarpa, leaping, dancing, drawing a bow and pointing' });
-}
-
-/* ---------- the chain: footer band ---------- */
-{
-  const m = compose([{ pre: pre('Long chain', 'warli'), box: { x: 0, y: 0, w: 2400, h: 200 } }], [C.paper, C.turmeric, C.paper, C.paper, C.ink]);
-  W('chain.svg', 2400, 200, m.body, { defs: m.defs });
-}
-
-/* ---------- small figures for the three steps ---------- */
-[['step-pick.svg', 'Pointing', 'A Warli figure pointing'], ['step-make.svg', 'Working', 'A Warli figure at work'], ['step-take.svg', 'Walking with a pot', 'A Warli figure walking off with a pot']].forEach(([f, n, label]) => {
-  const m = compose([{ pre: pre(n, 'warli'), box: { x: 0, y: 0, w: 400, h: 400 }, o: { weight: 3.4 } }], [C.ink, C.geru, C.ink, C.ink, C.sand]);
-  W(f, 400, 400, m.body, { defs: m.defs, label });
-});
-
-/* ---------- one card per tradition: its peacock, on its own ground ---------- */
 const keys = R.styleKeys();
-const cards = keys.map(k => {
+
+/* ---------- one peacock per tradition, ready to draw itself ---------- */
+const trads = keys.map(k => {
   const st = S.STYLES[k], t = TRAD[k] || {};
   const pal = palOf(k, t.pal);
   const p = (t.peacock && R.findPreset(t.peacock, k)) ||
     R.presetsOf(k).find(p => isSquare(p) && /peacock|bird/i.test(p.name)) || R.presetsOf(k).find(isSquare);
-  const m = R.pieceMarkup(p, { x: 40, y: 40, w: 520, h: 520 }, { colors: pal.colors, detail: .8 });
+  const m = R.pieceMarkup(p, { x: 30, y: 30, w: 540, h: 540 }, { colors: pal.colors, detail: .8, animate: true });
   const label = `${p.name}, drawn by Scrawl in the ${st.name} style`;
-  W(`trad-${k}.svg`, 600, 600, m.body, { defs: m.defs, ground: pal.paper, label });
-  const rule = t.rule || String(st.note || '').split(/(?<=\.)\s/)[0];
-  const n = R.presetsOf(k).length, np = S.stylePalettes(k).length;
-  const nt = S.TEMPLATES.filter(x => (x.style || 'sketch') === k && (x.items || []).length).length;
-  return `      <li class="trad" style="--tg:${pal.paper};--tf:${pal.colors[0]}">
-        <img src="art/trad-${k}.svg" alt="${esc(label)}" width="600" height="600" loading="lazy" decoding="async">
-        <div class="trad-body">
-          <p class="trad-where">${esc(st.where || t.medium || '')}</p>
-          <h3>${esc(st.name)}</h3>
-          <p class="trad-rule">${esc(rule)}</p>
-          <p class="trad-meta">${n} motifs · ${np} palettes · ${nt} templates</p>
-          <a class="trad-try" href="#try" data-trad="${k}">Try ${esc(st.name)}<span class="visually-hidden"> in the demo</span> <span aria-hidden="true">→</span></a>
-        </div>
-      </li>`;
-}).join('\n');
+  W(`draw-${k}.svg`, 600, 600, m.body, { defs: m.defs, label });
+  return {
+    k, name: st.name, where: st.where || t.medium || '', medium: t.medium || '', label,
+    rule: t.rule || String(st.note || '').split(/(?<=\.)\s/)[0],
+    ground: pal.paper, ink: pal.colors[0], accent: pal.colors[1],
+    motifs: R.presetsOf(k).length, palettes: S.stylePalettes(k).length,
+    templates: S.TEMPLATES.filter(x => (x.style || 'sketch') === k && (x.items || []).length).length,
+  };
+});
 
-/* ---------- write cards and counts into the page ---------- */
+/* ---------- finished pieces for the "made in an afternoon" wall ----------
+   These are whole templates, thousands of marks each: as SVG they would
+   weigh megabytes and be slow to paint. They are rasterised to small
+   WebP images instead, with Playwright's Chromium when it is installed
+   (the rest of the build doesn't need it). */
+const MADE = [
+  ['invite', 'madhubani', 'Wedding'],
+  ['post', 'warli', 'Tarpa dance'],
+  ['album', 'gond', 'Peacock'],
+  ['tote', 'kalamkari', 'Paisley medallion'],
+  ['print', 'pattachitra', 'Dancer in a doorway'],
+  ['book', 'kalamkari', 'Tree on black'],
+  ['tea', 'madhubani', 'Two fish'],
+  ['poster', 'gond', 'Tree of life'],
+];
+const made = MADE.map(([name, style, tname]) => {
+  const tpl = S.TEMPLATES.find(t => (t.style || 'sketch') === style && t.name === tname);
+  if (!tpl) { console.warn('no template', style, tname); return null; }
+  /* no paper grain: a noise filter is slow to paint */
+  const svg = R.template(Object.assign({}, tpl, { texture: 'none' }), { detail: .8 })
+    .replace('<svg class="poster"', `<svg xmlns="http://www.w3.org/2000/svg" width="${tpl.w}" height="${tpl.h}"`);
+  return { name, svg: fmt(svg), w: tpl.w, h: tpl.h };
+}).filter(Boolean);
+const madeDone = (async () => {
+  let pw;
+  for (const where of [process.env.PLAYWRIGHT, 'playwright', '/opt/node22/lib/node_modules/playwright']) {
+    if (!where) continue;
+    try { pw = require(where); break; } catch (e) { }
+  }
+  if (!pw) { console.warn('Playwright not found: kept the existing made-*.webp images'); return; }
+  const browser = await pw.chromium.launch();
+  const page = await browser.newPage();
+  for (const m of made) {
+    const width = 720, height = Math.round(width * m.h / m.w);
+    const data = await page.evaluate(async ({ svg, width, height }) => {
+      const img = new Image();
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+      await img.decode();
+      const c = document.createElement('canvas'); c.width = width; c.height = height;
+      c.getContext('2d').drawImage(img, 0, 0, width, height);
+      return c.toDataURL('image/webp', .8);
+    }, { svg: m.svg, width, height });
+    const buf = Buffer.from(data.split(',')[1], 'base64');
+    fs.writeFileSync(path.join(OUT, `made-${m.name}.webp`), buf);
+    sizes[`made-${m.name}.webp`] = buf.length;
+  }
+  await browser.close();
+})();
+
+/* ---------- the chain: walks along the foot of the page ---------- */
+{
+  const m = compose([{ pre: pre('Long chain', 'warli'), box: { x: 0, y: 0, w: 2400, h: 200 } }], [C.bone, C.sindoor, C.bone, C.bone, C.night]);
+  W('chain.svg', 2400, 200, m.body, { defs: m.defs });
+}
+
+/* ---------- the tradition index ---------- */
+const two = n => String(n).padStart(2, '0');
+const rows = trads.map((t, i) => `        <li class="rb" style="--tg:${t.ground};--tf:${t.ink};--ta:${t.accent}" data-k="${t.k}" data-label="${esc(t.label)}">
+          <button class="rb-head" type="button" aria-expanded="${i === 0}" aria-controls="rb-${t.k}">
+            <span class="rb-no">${two(i + 1)}</span>
+            <span class="rb-name">${esc(t.name)}</span>
+            <span class="rb-where">${esc(t.where)}</span>
+          </button>
+          <div class="rb-body" id="rb-${t.k}">
+            <p class="rb-rule">${esc(t.rule)}</p>
+            <p class="rb-meta">${t.motifs} motifs · ${t.palettes} palettes · ${t.templates} templates</p>
+            <div class="rb-art" aria-hidden="true"></div>
+          </div>
+        </li>`).join('\n');
+
+/* the hero's sequence, as data the page script reads */
+const seq = trads.map(t => ({ k: t.k, name: t.name, where: t.where, rule: t.rule, g: t.ground, f: t.ink, a: t.accent, label: t.label }));
+
+/* ---------- write the index, the sequence and the counts into the page ---------- */
 const counts = {
   traditions: keys.length,
   motifs: S.PRESETS.filter(p => keys.includes(p.style)).length,
@@ -146,15 +191,18 @@ const counts = {
 };
 const WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve'];
 let page = fs.readFileSync(PAGE, 'utf8');
-page = page.replace(/(<!-- build:traditions -->)[\s\S]*?(\s*<!-- \/build:traditions -->)/, `$1\n${cards}$2`);
-page = page.replace(/(<([a-z]+)[^>]*\bdata-count="(\w+)"[^>]*>)[^<]*(<\/\2>)/g, (all, open, tag, key, close) => {
+page = page.replace(/(<!-- build:traditions -->)[\s\S]*?(\s*<!-- \/build:traditions -->)/, `$1\n${rows}$2`);
+page = page.replace(/(<script type="application\/json" id="seq">)[\s\S]*?(<\/script>)/, `$1${JSON.stringify(seq).replace(/</g, '\\u003c')}$2`);
+page = page.replace(/(<([a-z]+)[^>]*\bdata-count="([\w-]+)"[^>]*>)[^<]*(<\/\2>)/g, (all, open, tag, key, close) => {
   if (key === 'traditions-word') return open + WORDS[counts.traditions] + close;
   return counts[key] != null ? open + counts[key].toLocaleString('en-US') + close : all;
 });
 fs.writeFileSync(PAGE, page);
 
+madeDone.then(() => {
 const kb = n => (n / 1024).toFixed(1) + ' KB';
 console.log('traditions:', keys.join(', '));
 console.log('counts:', JSON.stringify(counts));
-Object.keys(sizes).forEach(k => console.log(k.padEnd(20), kb(sizes[k])));
-console.log('total'.padEnd(20), kb(Object.values(sizes).reduce((a, b) => a + b, 0)));
+Object.keys(sizes).forEach(k => console.log(k.padEnd(22), kb(sizes[k])));
+console.log('total'.padEnd(22), kb(Object.values(sizes).reduce((a, b) => a + b, 0)));
+});

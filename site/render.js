@@ -71,17 +71,13 @@
     const cols = o.colors, slot = Object.assign({ c: 0, a: 1, f: 4 }, o.slots || {});
     const weight = o.weight != null ? o.weight : hand.weight;
     const sw = weight / (((b.w + b.h) / 200) || 1);
-    const n = h.strokes.length;
     let defs = '', body = '';
     /* A hatch or dot fill clips hundreds of marks to one shape: that
        shape is defined once, and runs of unfilled marks that look the
        same are joined into one path. Fewer nodes, same picture, and a
-       page that stays quick on an old machine. (Not when animating:
-       each mark then draws on in its own turn.) */
-    const clips = new Map();
-    let run = null;
-    const flush = () => { if (run) body += `<path d="${run.d}"${run.attrs}/>`; run = null; };
-    h.strokes.forEach((st, i) => {
+       page that stays quick on an old machine. */
+    const clips = new Map(), out = [];
+    h.strokes.forEach(st => {
       let ca = '';
       if (st.clip) {
         let id = clips.get(st.clip);
@@ -91,18 +87,20 @@
       const stroke = cols[st.role === 'accent' ? slot.a : st.role === 'fill' ? slot.f : slot.c];
       const fill = st.fill === 'none' ? 'none' : cols[st.fill === 'accent' ? slot.a : st.fill === 'fill' ? slot.f : slot.c];
       const attrs = ` fill="${fill}" stroke="${stroke}" stroke-width="${(st.w * sw).toFixed(3)}" stroke-linecap="${st.cap}" stroke-linejoin="round"${st.op !== 1 ? ` opacity="${st.op}"` : ''}${ca}`;
-      if (o.animate) { body += `<path d="${st.d}"${attrs} pathLength="1" style="--i:${(i / Math.max(1, n - 1)).toFixed(3)}"/>`; return; }
-      if (fill === 'none' && st.op === 1 && run && run.attrs === attrs) { run.d += st.d; return; }
-      flush();
-      run = { d: st.d, attrs };
-      if (fill !== 'none' || st.op !== 1) flush();
+      const last = out[out.length - 1];
+      if (fill === 'none' && st.op === 1 && last && last.open && last.attrs === attrs) { last.d += st.d; return; }
+      out.push({ d: st.d, attrs, open: fill === 'none' && st.op === 1 });
     });
-    flush();
+    /* o.animate: each path draws on in its turn (see .draw in the CSS) */
+    const m = Math.max(1, out.length - 1);
+    out.forEach((p, i) => {
+      body += `<path d="${p.d}"${p.attrs}${o.animate ? ` pathLength="1" style="--i:${(i / m).toFixed(3)}"` : ''}/>`;
+    });
     const rot = o.rot ? ` rotate(${o.rot} ${b.w / 2} ${b.h / 2})` : '';
     return {
       defs,
       body: `<g transform="translate(${b.x.toFixed(2)} ${b.y.toFixed(2)})${rot} scale(${(b.w / 100).toFixed(5)} ${(b.h / 100).toFixed(5)})">${body}</g>`,
-      count: n,
+      count: out.length,
     };
   }
 

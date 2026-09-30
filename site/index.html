@@ -3,323 +3,327 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Scrawl · Indian folk art, drawn by its own rules</title>
-<meta name="description" content="Warli, Gond, Madhubani, Pattachitra, Kalamkari and a loose sketchbook, drawn by their own rules in a little studio that runs in your browser. Free to start.">
-<meta property="og:title" content="Scrawl · Old rules. Fresh ink.">
-<meta property="og:description" content="Six Indian folk art traditions, drawn by their own rules in a studio that runs in your browser.">
-<meta name="theme-color" content="#A63D1E">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23A63D1E'/%3E%3Ccircle cx='16' cy='8' r='3.2' fill='%23FBF6EE'/%3E%3Cpath d='M9.5 12h13L16 18.5zM16 18.5l-6.5 7h13z' fill='%23FBF6EE'/%3E%3C/svg%3E">
-<link rel="preload" href="fonts/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
+<title>Scrawl · Six traditions. One pen.</title>
+<meta name="description" content="Scrawl draws Warli, Gond, Madhubani, Pattachitra, Kalamkari and sketchbook art by their real rules. Make invites, posts, prints and merch in an afternoon, right in your browser.">
+<meta property="og:title" content="Scrawl · Six traditions. One pen.">
+<meta property="og:description" content="A drawing machine for Indian folk art. Make invites, posts, prints and merch in an afternoon.">
+<meta name="theme-color" content="#0E0D0B">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23FF5A1F'/%3E%3Ccircle cx='16' cy='8' r='3.2' fill='%230E0D0B'/%3E%3Cpath d='M9.5 12h13L16 18.5zM16 18.5l-6.5 7h13z' fill='%230E0D0B'/%3E%3C/svg%3E">
+<link rel="preload" href="fonts/anybody.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="site.css">
-<script>document.documentElement.className='js'</script>
+<script>document.documentElement.className='js'+((navigator.hardwareConcurrency||4)<=2||(navigator.connection&&navigator.connection.saveData)?' lite':'')</script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
 
-<header class="top" id="top">
-  <div class="wrap top-in">
-    <a class="logo" href="#main" aria-label="Scrawl, home">
-      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="7.5" r="3.4"/><path d="M8.5 12h15L16 19zM16 19l-7.5 8h15z"/></svg>
-      <span>scrawl</span>
-    </a>
-    <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="menu"><span>Menu</span><i aria-hidden="true"></i></button>
-    <nav class="menu" id="menu" aria-label="Main">
-      <ul>
-        <li><a href="#traditions">Traditions</a></li>
-        <li><a href="#try">Have a go</a></li>
-        <li><a href="#how">How it works</a></li>
-        <li><a href="#pricing">Pricing</a></li>
-        <li><a href="#faq">FAQ</a></li>
-      </ul>
-      <a class="btn btn--geru btn--sm" data-editor href="../index.html">Start drawing</a>
-    </nav>
-  </div>
+<header class="nav" id="nav">
+  <a class="logo" href="#main" aria-label="Scrawl, home">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="7.5" r="3.4"/><path d="M8.5 12h15L16 19zM16 19l-7.5 8h15z"/></svg>
+    <span>scrawl</span>
+  </a>
+  <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="menu"><span>Menu</span><i aria-hidden="true"></i></button>
+  <nav class="menu" id="menu" aria-label="Main">
+    <ul>
+      <li><a href="#made">Work</a></li>
+      <li><a href="#rules">Rulebooks</a></li>
+      <li><a href="#studio">Try it</a></li>
+      <li><a href="#pro">Pricing</a></li>
+    </ul>
+    <a class="btn btn--hot btn--sm" data-editor href="../index.html"><span>Open the studio</span></a>
+  </nav>
 </header>
 
 <main id="main">
 
-  <!-- ============ HERO: the wall ============ -->
+  <!-- ============ HERO: the machine at work ============ -->
   <section class="hero" aria-labelledby="heroTitle">
-    <div class="wrap">
-      <div class="wall">
-        <div class="wall-copy">
-          <p class="pill pill--light"><b data-count="traditions">6</b> folk traditions, one little studio</p>
-          <h1 id="heroTitle">Old rules.<br>Fresh ink.</h1>
-          <p class="lede">Draw Warli, Gond, Madhubani, Pattachitra, Kalamkari and a loose sketchbook, each by its own rules, in a studio that runs in your browser. Come for the peacocks, stay for the patterns.</p>
-          <div class="ctas">
-            <a class="btn btn--turmeric" data-editor href="../index.html">Start drawing, it's free</a>
-            <a class="btn btn--ghost" href="#traditions">See the traditions</a>
-          </div>
-        </div>
-        <img class="ring" src="art/ring.svg" width="800" height="800" alt="A Warli tarpa dance: figures holding hands in a ring around a musician playing the tarpa" fetchpriority="high">
-        <img class="ground" src="art/ground.svg" width="2400" height="70" alt="">
+    <div class="hero-copy">
+      <p class="mono tag"><span class="blink" aria-hidden="true"></span>A drawing machine for Indian folk art</p>
+      <h1 id="heroTitle" class="kinetic"><span class="l1" data-split>Six traditions.</span> <span class="l2" data-split>One pen.</span></h1>
+      <p class="lede">Scrawl draws Warli, Gond, Madhubani, Pattachitra, Kalamkari and sketchbook art by their real rules. Make invites, posts, prints and merch in an afternoon, right in your browser.</p>
+      <div class="ctas">
+        <a class="btn btn--hot" data-editor href="../index.html"><span>Open the studio, it's free</span></a>
+        <a class="btn btn--ghost" href="#made"><span>See what people make</span></a>
       </div>
     </div>
+
+    <figure class="stage" id="stage">
+      <div class="arch" id="arch">
+        <div class="arch-art draw" id="heroArt" role="img" aria-label="A peacock, drawn by Scrawl"></div>
+      </div>
+      <svg class="badge" viewBox="0 0 200 200" aria-hidden="true">
+        <defs><path id="badgeRing" d="M100 100m-74 0a74 74 0 1 1 148 0a74 74 0 1 1-148 0"/></defs>
+        <circle cx="100" cy="100" r="98"/>
+        <g class="badge-spin"><text><textPath href="#badgeRing" textLength="460" lengthAdjust="spacing">FREE IN BETA ✦ FREE IN BETA ✦ FREE IN BETA ✦</textPath></text></g>
+        <path class="badge-fig" d="M100 70a7 7 0 1 1 0 .1zM84 84h32l-16 16zM100 100l-16 18h32z"/>
+      </svg>
+      <figcaption class="readout mono">
+        <span class="ro-now">Now drawing <b id="heroName">Warli</b></span>
+        <span class="ro-rule" id="heroRule">No figure is larger than another.</span>
+        <span class="ro-seed">Seed <b id="heroSeed">000000</b></span>
+      </figcaption>
+      <div class="stage-ctl">
+        <ol class="dots" id="heroDots" aria-label="Draw it as"></ol>
+        <button class="pause" id="heroPause" type="button" aria-pressed="false"><span>Pause</span></button>
+      </div>
+    </figure>
   </section>
 
-  <!-- ============ WHAT'S IN THE STUDIO ============ -->
-  <section class="stock" aria-labelledby="stockTitle">
-    <div class="wrap">
-      <h2 class="visually-hidden" id="stockTitle">What's in the studio</h2>
-      <ul class="stock-list">
-        <li><b data-count="traditions">6</b><span>living traditions</span></li>
-        <li><b data-count="motifs">1,104</b><span>motifs to place</span></li>
-        <li><b data-count="templates">67</b><span>ready templates</span></li>
-        <li><b data-count="palettes">72</b><span>palettes from the source</span></li>
-        <li><b>Free</b><span>export to PNG, JPG and WebP</span></li>
-      </ul>
+  <div class="band-clip" aria-hidden="true"><div class="band">
+    <div class="band-track loop">
+      <span>Warli ✦ Gond ✦ Madhubani ✦ Pattachitra ✦ Kalamkari ✦ Sketchbook ✦&nbsp;</span><span>Warli ✦ Gond ✦ Madhubani ✦ Pattachitra ✦ Kalamkari ✦ Sketchbook ✦&nbsp;</span>
+    </div>
+  </div></div>
+
+  <!-- ============ MADE IN AN AFTERNOON ============ -->
+  <section class="sec" id="made" aria-labelledby="madeTitle">
+    <header class="sec-head">
+      <p class="mono num">01 / The work</p>
+      <h2 id="madeTitle" class="reveal">Made in an afternoon.</h2>
+      <p class="sec-lede">Wedding invites, festival posts, album art, tote bags, book covers, packaging. Pick a tradition, add your words, export. Every piece here started as a Scrawl template.</p>
+    </header>
+    <div class="belts" id="belts">
+      <div class="belt">
+        <ul class="belt-track loop" role="list">
+          <li class="mk mk--invite"><div class="mk-obj"><img src="art/made-invite.webp" width="720" height="900" alt="" loading="lazy" decoding="async"></div><p class="mk-cap mono"><b>Wedding invite</b> Madhubani · 20 min</p></li>
+          <li class="mk mk--post"><div class="mk-obj"><img src="art/made-post.webp" width="720" height="720" alt="" loading="lazy" decoding="async"><p class="mk-over mk-over--post"><b>Dance night</b><span>Sat · rooftop · 8 pm</span></p></div><p class="mk-cap mono"><b>Event post</b> Warli · 12 min</p></li>
+          <li class="mk mk--album"><div class="mk-obj"><img src="art/made-album.webp" width="720" height="720" alt="" loading="lazy" decoding="async"><p class="mk-over mk-over--album"><b>Monsoon Tapes</b><span>Side A</span></p></div><p class="mk-cap mono"><b>Album cover</b> Gond · 25 min</p></li>
+          <li class="mk mk--tote"><div class="mk-obj"><img src="art/made-tote.webp" width="720" height="720" alt="" loading="lazy" decoding="async"></div><p class="mk-cap mono"><b>Tote bag</b> Kalamkari · 15 min</p></li>
+        </ul>
+      </div>
+      <div class="belt belt--rev">
+        <ul class="belt-track loop" role="list">
+          <li class="mk mk--print"><div class="mk-obj"><img src="art/made-print.webp" width="720" height="900" alt="" loading="lazy" decoding="async"></div><p class="mk-cap mono"><b>Wall print</b> Pattachitra · 30 min</p></li>
+          <li class="mk mk--book"><div class="mk-obj"><img src="art/made-book.webp" width="720" height="900" alt="" loading="lazy" decoding="async"><p class="mk-over mk-over--book"><b>The Long Monsoon</b><span>a novel</span></p></div><p class="mk-cap mono"><b>Book cover</b> Kalamkari · 40 min</p></li>
+          <li class="mk mk--tea"><div class="mk-obj"><img src="art/made-tea.webp" width="720" height="720" alt="" loading="lazy" decoding="async"><p class="mk-over mk-over--tea"><b>Two Fish</b><span>Masala chai · 100 g</span></p></div><p class="mk-cap mono"><b>Tea label</b> Madhubani · 18 min</p></li>
+          <li class="mk mk--poster"><div class="mk-obj"><img src="art/made-poster.webp" width="720" height="900" alt="" loading="lazy" decoding="async"><p class="mk-over mk-over--poster"><b>Forest Week</b><span>Talks · walks · music</span></p></div><p class="mk-cap mono"><b>Festival poster</b> Gond · 35 min</p></li>
+        </ul>
+      </div>
+      <button class="pause pause--belts" id="beltPause" type="button" aria-pressed="false"><span>Pause</span></button>
     </div>
   </section>
 
-  <!-- ============ TRADITIONS ============ -->
-  <section class="section" id="traditions" aria-labelledby="tradTitle">
-    <div class="wrap">
-      <header class="head">
-        <p class="kicker">Ways to draw</p>
-        <h2 id="tradTitle"><span data-count="traditions-word">Six</span> traditions. Every one has rules.</h2>
-        <p class="head-lede">No art school needed. Pick a tradition and its rules do the heavy lifting: what gets filled, how thick a line runs, what the border must hold.</p>
-      </header>
-      <ul class="trads" role="list">
+  <!-- ============ SIX RULEBOOKS ============ -->
+  <section class="sec" id="rules" aria-labelledby="rulesTitle">
+    <header class="sec-head">
+      <p class="mono num">02 / The rulebooks</p>
+      <h2 id="rulesTitle" class="reveal"><span data-count="traditions-word">Six</span> rulebooks. One engine.</h2>
+      <p class="sec-lede">A tradition is a set of rules, not a folder of clip art. Warli and Gond draw the same deer and look nothing alike, because the rules underneath are opposite. Scrawl keeps the rules, so everything you make holds together.</p>
+    </header>
+    <div class="rb-wrap">
+      <ol class="rbs" id="rbs">
 <!-- build:traditions -->
-      <li class="trad" style="--tg:#B4603C;--tf:#FCF7EE">
-        <img src="art/trad-warli.svg" alt="Peacock, drawn by Scrawl in the Warli style" width="600" height="600" loading="lazy" decoding="async">
-        <div class="trad-body">
-          <p class="trad-where">Maharashtra, India</p>
-          <h3>Warli</h3>
-          <p class="trad-rule">No figure is larger than another.</p>
-          <p class="trad-meta">139 motifs · 6 palettes · 8 templates</p>
-          <a class="trad-try" href="#try" data-trad="warli">Try Warli<span class="visually-hidden"> in the demo</span> <span aria-hidden="true">→</span></a>
-        </div>
-      </li>
-      <li class="trad" style="--tg:#24402E;--tf:#EFE6CE">
-        <img src="art/trad-gond.svg" alt="Great peacock, drawn by Scrawl in the Gond style" width="600" height="600" loading="lazy" decoding="async">
-        <div class="trad-body">
-          <p class="trad-where">Madhya Pradesh, India</p>
-          <h3>Gond</h3>
-          <p class="trad-rule">The fill is the signature.</p>
-          <p class="trad-meta">133 motifs · 7 palettes · 8 templates</p>
-          <a class="trad-try" href="#try" data-trad="gond">Try Gond<span class="visually-hidden"> in the demo</span> <span aria-hidden="true">→</span></a>
-        </div>
-      </li>
-      <li class="trad" style="--tg:#F2E6CC;--tf:#1E1712">
-        <img src="art/trad-madhubani.svg" alt="Peacock in display, drawn by Scrawl in the Madhubani style" width="600" height="600" loading="lazy" decoding="async">
-        <div class="trad-body">
-          <p class="trad-where">Mithila, Bihar</p>
-          <h3>Madhubani</h3>
-          <p class="trad-rule">No ground is left bare.</p>
-          <p class="trad-meta">136 motifs · 7 palettes · 8 templates</p>
-          <a class="trad-try" href="#try" data-trad="madhubani">Try Madhubani<span class="visually-hidden"> in the demo</span> <span aria-hidden="true">→</span></a>
-        </div>
-      </li>
-      <li class="trad" style="--tg:#E1B13A;--tf:#15100C">
-        <img src="art/trad-pattachitra.svg" alt="Great peacock, drawn by Scrawl in the Pattachitra style" width="600" height="600" loading="lazy" decoding="async">
-        <div class="trad-body">
-          <p class="trad-where">Puri, Odisha</p>
-          <h3>Pattachitra</h3>
-          <p class="trad-rule">The border is half the painting.</p>
-          <p class="trad-meta">87 motifs · 6 palettes · 8 templates</p>
-          <a class="trad-try" href="#try" data-trad="pattachitra">Try Pattachitra<span class="visually-hidden"> in the demo</span> <span aria-hidden="true">→</span></a>
-        </div>
-      </li>
-      <li class="trad" style="--tg:#223756;--tf:#F1E4C6">
-        <img src="art/trad-kalamkari.svg" alt="Peacock, drawn by Scrawl in the Kalamkari style" width="600" height="600" loading="lazy" decoding="async">
-        <div class="trad-body">
-          <p class="trad-where">Srikalahasti, Andhra Pradesh</p>
-          <h3>Kalamkari</h3>
-          <p class="trad-rule">The pen draws. The dye decides.</p>
-          <p class="trad-meta">85 motifs · 6 palettes · 8 templates</p>
-          <a class="trad-try" href="#try" data-trad="kalamkari">Try Kalamkari<span class="visually-hidden"> in the demo</span> <span aria-hidden="true">→</span></a>
-        </div>
-      </li>
-      <li class="trad" style="--tg:#F2EDE4;--tf:#141414">
-        <img src="art/trad-sketch.svg" alt="Crested bird, drawn by Scrawl in the Sketchbook style" width="600" height="600" loading="lazy" decoding="async">
-        <div class="trad-body">
-          <p class="trad-where">the original Scrawl library</p>
-          <h3>Sketchbook</h3>
-          <p class="trad-rule">Everything is drawn twice.</p>
-          <p class="trad-meta">524 motifs · 40 palettes · 27 templates</p>
-          <a class="trad-try" href="#try" data-trad="sketch">Try Sketchbook<span class="visually-hidden"> in the demo</span> <span aria-hidden="true">→</span></a>
-        </div>
-      </li>
+        <li class="rb" style="--tg:#B4603C;--tf:#FCF7EE;--ta:#EBD3B4" data-k="warli" data-label="Peacock, drawn by Scrawl in the Warli style">
+          <button class="rb-head" type="button" aria-expanded="true" aria-controls="rb-warli">
+            <span class="rb-no">01</span>
+            <span class="rb-name">Warli</span>
+            <span class="rb-where">Maharashtra, India</span>
+          </button>
+          <div class="rb-body" id="rb-warli">
+            <p class="rb-rule">No figure is larger than another.</p>
+            <p class="rb-meta">139 motifs · 6 palettes · 8 templates</p>
+            <div class="rb-art" aria-hidden="true"></div>
+          </div>
+        </li>
+        <li class="rb" style="--tg:#24402E;--tf:#EFE6CE;--ta:#E0A03C" data-k="gond" data-label="Great peacock, drawn by Scrawl in the Gond style">
+          <button class="rb-head" type="button" aria-expanded="false" aria-controls="rb-gond">
+            <span class="rb-no">02</span>
+            <span class="rb-name">Gond</span>
+            <span class="rb-where">Madhya Pradesh, India</span>
+          </button>
+          <div class="rb-body" id="rb-gond">
+            <p class="rb-rule">The fill is the signature.</p>
+            <p class="rb-meta">133 motifs · 7 palettes · 8 templates</p>
+            <div class="rb-art" aria-hidden="true"></div>
+          </div>
+        </li>
+        <li class="rb" style="--tg:#F2E6CC;--tf:#1E1712;--ta:#C8321E" data-k="madhubani" data-label="Peacock in display, drawn by Scrawl in the Madhubani style">
+          <button class="rb-head" type="button" aria-expanded="false" aria-controls="rb-madhubani">
+            <span class="rb-no">03</span>
+            <span class="rb-name">Madhubani</span>
+            <span class="rb-where">Mithila, Bihar</span>
+          </button>
+          <div class="rb-body" id="rb-madhubani">
+            <p class="rb-rule">No ground is left bare.</p>
+            <p class="rb-meta">136 motifs · 7 palettes · 8 templates</p>
+            <div class="rb-art" aria-hidden="true"></div>
+          </div>
+        </li>
+        <li class="rb" style="--tg:#E1B13A;--tf:#15100C;--ta:#F4EEDC" data-k="pattachitra" data-label="Great peacock, drawn by Scrawl in the Pattachitra style">
+          <button class="rb-head" type="button" aria-expanded="false" aria-controls="rb-pattachitra">
+            <span class="rb-no">04</span>
+            <span class="rb-name">Pattachitra</span>
+            <span class="rb-where">Puri, Odisha</span>
+          </button>
+          <div class="rb-body" id="rb-pattachitra">
+            <p class="rb-rule">The border is half the painting.</p>
+            <p class="rb-meta">87 motifs · 6 palettes · 8 templates</p>
+            <div class="rb-art" aria-hidden="true"></div>
+          </div>
+        </li>
+        <li class="rb" style="--tg:#223756;--tf:#F1E4C6;--ta:#C4553A" data-k="kalamkari" data-label="Peacock, drawn by Scrawl in the Kalamkari style">
+          <button class="rb-head" type="button" aria-expanded="false" aria-controls="rb-kalamkari">
+            <span class="rb-no">05</span>
+            <span class="rb-name">Kalamkari</span>
+            <span class="rb-where">Srikalahasti, Andhra Pradesh</span>
+          </button>
+          <div class="rb-body" id="rb-kalamkari">
+            <p class="rb-rule">The pen draws. The dye decides.</p>
+            <p class="rb-meta">85 motifs · 6 palettes · 8 templates</p>
+            <div class="rb-art" aria-hidden="true"></div>
+          </div>
+        </li>
+        <li class="rb" style="--tg:#F2EDE4;--tf:#141414;--ta:#E01E37" data-k="sketch" data-label="Crested bird, drawn by Scrawl in the Sketchbook style">
+          <button class="rb-head" type="button" aria-expanded="false" aria-controls="rb-sketch">
+            <span class="rb-no">06</span>
+            <span class="rb-name">Sketchbook</span>
+            <span class="rb-where">the original Scrawl library</span>
+          </button>
+          <div class="rb-body" id="rb-sketch">
+            <p class="rb-rule">Everything is drawn twice.</p>
+            <p class="rb-meta">524 motifs · 40 palettes · 27 templates</p>
+            <div class="rb-art" aria-hidden="true"></div>
+          </div>
+        </li>
 <!-- /build:traditions -->
-      </ul>
-    </div>
-  </section>
-
-  <!-- ============ HAVE A GO: the live demo ============ -->
-  <section class="section section--sand" id="try" aria-labelledby="tryTitle">
-    <div class="wrap">
-      <header class="head">
-        <p class="kicker">Have a go</p>
-        <h2 id="tryTitle">The real studio, right here.</h2>
-        <p class="head-lede">Pick a tradition, change the palette, or shuffle the hand. Every line below is drawn fresh, right now, in your browser.</p>
-      </header>
-      <div class="demo" id="demo" data-state="idle">
-        <div class="demo-bar">
-          <div class="demo-trads" id="demoTrads" role="group" aria-label="Tradition"></div>
-        </div>
-        <div class="demo-stage">
-          <div class="demo-board" id="demoBoard">
-            <img class="demo-ph" src="art/trad-warli.svg" alt="" width="600" height="600">
-          </div>
-          <p class="demo-status" id="demoStatus" role="status">Loading the studio…</p>
-        </div>
-        <div class="demo-side">
-          <div class="demo-block">
-            <p class="demo-label" id="palLabel">Palette <span id="palName"></span></p>
-            <div class="demo-pals" id="demoPals" role="group" aria-labelledby="palLabel"></div>
-          </div>
-          <div class="demo-block">
-            <p class="demo-label">Template</p>
-            <div class="demo-tpls" id="demoTpls" role="group" aria-label="Template"></div>
-          </div>
-          <div class="demo-block demo-block--row">
-            <button class="btn btn--ink btn--sm" id="demoShuffle" type="button" disabled>Shuffle the hand</button>
-            <a class="btn btn--line btn--sm" data-editor href="../index.html">Open in the studio</a>
-          </div>
-          <p class="demo-rule" id="demoRule"></p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============ HOW IT WORKS ============ -->
-  <section class="section" id="how" aria-labelledby="howTitle">
-    <div class="wrap">
-      <header class="head">
-        <p class="kicker">How it works</p>
-        <h2 id="howTitle">Blank page to finished piece in three moves.</h2>
-      </header>
-      <ol class="steps">
-        <li>
-          <img src="art/step-pick.svg" alt="" width="400" height="400" loading="lazy">
-          <h3><span class="step-no">1</span> Pick a tradition</h3>
-          <p>Start from a template or an empty board. The palette, line and fill switch to that tradition's rules.</p>
-        </li>
-        <li>
-          <img src="art/step-make.svg" alt="" width="400" height="400" loading="lazy">
-          <h3><span class="step-no">2</span> Make it yours</h3>
-          <p>Place motifs, add your words in any of 217 fonts, recolour it, and shuffle the hand until it feels right.</p>
-        </li>
-        <li>
-          <img src="art/step-take.svg" alt="" width="400" height="400" loading="lazy">
-          <h3><span class="step-no">3</span> Take it anywhere</h3>
-          <p>Export for a post, a print, an invite or a wall. Your files stay in your browser, never on our servers.</p>
-        </li>
       </ol>
+      <div class="rb-preview" id="rbPreview" aria-hidden="true"><div class="rb-canvas draw" id="rbCanvas"></div></div>
     </div>
   </section>
 
-  <!-- ============ PRICING ============ -->
-  <section class="section section--sand" id="pricing" aria-labelledby="priceTitle">
-    <div class="wrap">
-      <header class="head">
-        <p class="kicker">Pricing</p>
-        <h2 id="priceTitle">Pick your pass. Every pass has perks.</h2>
-        <p class="head-lede">Free covers everything you need to make the work. Pro is for getting it out into the world.</p>
-        <p class="beta" id="betaNote">Scrawl is in beta, so every Pro feature is free to use right now.</p>
-      </header>
-      <ul class="passes" role="list">
-        <li class="pass">
-          <h3 class="pass-name">Free</h3>
-          <p class="pass-price"><b>$0</b><span>forever</span></p>
-          <p class="pass-note">No account, no card.</p>
-          <a class="btn btn--line" data-editor href="../index.html">Start drawing</a>
-          <ul class="ticks">
-            <li>Every tradition, motif and template</li>
-            <li>All 217 fonts, including Indian scripts</li>
-            <li>PNG, JPG and WebP export up to 2×</li>
-            <li>Unlimited files, saved in your browser</li>
-          </ul>
-        </li>
-        <li class="pass">
-          <h3 class="pass-name">Pro monthly</h3>
-          <p class="pass-price"><b data-price="monthly">$9</b><span>per month</span></p>
-          <p class="pass-note">Cancel any time.</p>
-          <a class="btn btn--ink" data-buy="monthly" data-editor href="../index.html">Free during beta</a>
-          <ul class="ticks">
-            <li class="lead">Everything in Free, plus</li>
-            <li>Export at 3× and 4×</li>
-            <li>Transparent backgrounds</li>
-            <li>SVG and PDF export</li>
-            <li>Print with bleed and crop marks</li>
-            <li>Brand kit: your colours and fonts, one click away</li>
-          </ul>
-        </li>
-        <li class="pass pass--best">
-          <p class="flag">Best value</p>
-          <h3 class="pass-name">Pro for life</h3>
-          <p class="pass-price"><b data-price="lifetime">$49</b><span>once</span></p>
-          <p class="pass-note">Pay once, keep every update.</p>
-          <a class="btn btn--turmeric" data-buy="lifetime" data-editor href="../index.html">Free during beta</a>
-          <ul class="ticks">
-            <li class="lead">Everything in Pro monthly, plus</li>
-            <li>No subscription, ever</li>
-            <li>Every future tradition and update</li>
-          </ul>
-        </li>
-      </ul>
-    </div>
-  </section>
-
-  <!-- ============ THE MAKERS ============ -->
-  <section class="makers" aria-labelledby="makersTitle">
-    <div class="wrap">
-      <img class="crew" src="art/crew.svg" width="1800" height="200" alt="Nine Warli figures in a row: waving, drumming, dancing, carrying water, playing the tarpa, leaping, dancing, drawing a bow and pointing" loading="lazy">
-      <div class="makers-in">
-        <h2 id="makersTitle">The rules are borrowed. The art belongs to its makers.</h2>
-        <p>Every tradition here is made and kept alive by communities of artists across India. Scrawl learns their rules so you can sketch in their spirit. If you love the look, find the artists and buy their work.</p>
+  <!-- ============ SHUFFLE THE HAND: the live demo ============ -->
+  <section class="sec sec--studio" id="studio" aria-labelledby="studioTitle">
+    <header class="sec-head">
+      <p class="mono num">03 / Try it</p>
+      <h2 id="studioTitle" class="reveal">Shuffle the hand.</h2>
+      <p class="sec-lede">This is the real engine, running on this page. Every press draws a hand that has never drawn before. Same seed, same drawing, forever.</p>
+    </header>
+    <div class="demo" id="demo" data-state="idle">
+      <div class="demo-trads" id="demoTrads" role="group" aria-label="Tradition"></div>
+      <div class="demo-stage">
+        <div class="demo-board" id="demoBoard"><img class="demo-ph" src="art/made-post.webp" alt="" width="720" height="720"></div>
+        <p class="demo-status mono" id="demoStatus" role="status">Loading the engine…</p>
+      </div>
+      <div class="demo-side">
+        <div class="demo-block">
+          <p class="mono demo-label" id="palLabel">Palette <span id="palName"></span></p>
+          <div class="demo-pals" id="demoPals" role="group" aria-labelledby="palLabel"></div>
+        </div>
+        <div class="demo-block">
+          <p class="mono demo-label">Template</p>
+          <div class="demo-tpls" id="demoTpls" role="group" aria-label="Template"></div>
+        </div>
+        <div class="demo-actions">
+          <button class="btn btn--hot" id="demoShuffle" type="button" disabled><span>Shuffle the hand</span></button>
+          <a class="btn btn--ghost" data-editor href="../index.html"><span>Open in the studio</span></a>
+        </div>
+        <p class="demo-seed mono">Seed <b id="demoSeed">000000</b></p>
       </div>
     </div>
+  </section>
+
+  <!-- ============ PRO ============ -->
+  <section class="sec" id="pro" aria-labelledby="proTitle">
+    <header class="sec-head">
+      <p class="mono num">04 / Pro</p>
+      <h2 id="proTitle" class="reveal">Pro pays for itself on the first job.</h2>
+      <p class="sec-lede">Free is everything you need to make the work. Pro is everything you need to sell it, print it and hand it over.</p>
+    </header>
+    <ul class="gains" role="list">
+      <li class="gain">
+        <div class="gain-vis gain-vis--big" aria-hidden="true"><img src="art/made-post.webp" alt="" width="720" height="720" loading="lazy"><i>4×</i></div>
+        <h3>Print it huge</h3>
+        <p>Export at 3× and 4×, with bleed and crop marks, ready for a poster shop or a wall.</p>
+      </li>
+      <li class="gain">
+        <div class="gain-vis gain-vis--clear" aria-hidden="true"><img src="art/draw-kalamkari.svg" alt="" width="600" height="600" loading="lazy"></div>
+        <h3>Put it on merch</h3>
+        <p>Transparent backgrounds, so a peacock goes straight onto a tee, a mug or a sticker.</p>
+      </li>
+      <li class="gain">
+        <div class="gain-vis gain-vis--vec" aria-hidden="true"><span>.svg</span><span>.pdf</span></div>
+        <h3>Hand it to any printer</h3>
+        <p>SVG and PDF export: sharp at any size, and the file every print shop asks for.</p>
+      </li>
+      <li class="gain">
+        <div class="gain-vis gain-vis--kit" aria-hidden="true"><i style="--c:#FF5A1F"></i><i style="--c:#F2B233"></i><i style="--c:#123A5C"></i><i style="--c:#F3EDE2"></i><b>Aa</b></div>
+        <h3>Stay on brand</h3>
+        <p>A brand kit keeps your colours and fonts one click away on every piece.</p>
+      </li>
+    </ul>
+
+    <div class="plans" id="pricing">
+      <div class="plan">
+        <h3 class="mono plan-name">Pro monthly</h3>
+        <p class="plan-price"><b data-price="monthly">$9</b><span>per month</span></p>
+        <p class="plan-note">Cancel any time. Keep every file.</p>
+        <a class="btn btn--ghost" data-buy="monthly" data-editor href="../index.html"><span>Free during beta</span></a>
+      </div>
+      <div class="plan plan--best">
+        <h3 class="mono plan-name">Pro for life <em>Best value</em></h3>
+        <p class="plan-price"><b data-price="lifetime">$49</b><span>once</span></p>
+        <p class="plan-note">Pay once. Every update, every new tradition.</p>
+        <a class="btn btn--night" data-buy="lifetime" data-editor href="../index.html"><span>Free during beta</span></a>
+      </div>
+      <div class="plan plan--free">
+        <h3 class="mono plan-name">Free, forever</h3>
+        <ul class="plan-list">
+          <li>Every tradition, motif and template</li>
+          <li>All 217 fonts, Indian scripts included</li>
+          <li>PNG, JPG and WebP up to 2×</li>
+          <li>No account. Files stay in your browser.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="beta mono" id="betaNote"><span class="blink" aria-hidden="true"></span>In beta: all of Pro is unlocked, free, right now.</p>
   </section>
 
   <!-- ============ FAQ ============ -->
-  <section class="section" id="faq" aria-labelledby="faqTitle">
-    <div class="wrap faq-wrap">
-      <header class="head">
-        <p class="kicker">FAQ</p>
-        <h2 id="faqTitle">Good questions.</h2>
-      </header>
-      <div class="faq">
-        <details><summary>Do I need an account?</summary><p>No. Scrawl runs in your browser and saves your work there. Nothing is uploaded unless you export it.</p></details>
-        <details><summary>What is free during the beta?</summary><p>Everything. While Scrawl is in beta every Pro feature is unlocked and wears a small Pro badge. At launch, Free keeps every tradition, motif, template and font.</p></details>
-        <details><summary>What does Pro for life include?</summary><p>Everything in Pro for a single payment, and every update that comes after you buy, new traditions included.</p></details>
-        <details><summary>Can I cancel Pro monthly?</summary><p>Any time. You keep Pro until the end of the month you paid for, and your files stay yours.</p></details>
-        <details><summary>Can I use what I make commercially?</summary><p>Yes, your designs are yours. Please don't pass them off as the hand-made work of a traditional artist.</p></details>
-        <details><summary>Will it run on my old laptop?</summary><p>Yes. Scrawl needs no install and no graphics card, just a browser from the last few years. It is at its best with a mouse or trackpad.</p></details>
-      </div>
+  <section class="sec sec--faq" id="faq" aria-labelledby="faqTitle">
+    <header class="sec-head">
+      <p class="mono num">05 / Questions</p>
+      <h2 id="faqTitle" class="reveal">Asked and answered.</h2>
+    </header>
+    <div class="faq">
+      <details><summary>Do I need an account?</summary><p>No. Scrawl runs in your browser and saves your work there. Nothing is uploaded unless you export it.</p></details>
+      <details><summary>Can I sell what I make?</summary><p>Yes, your designs are yours to use and sell. Please don't pass them off as the hand-made work of a traditional artist.</p></details>
+      <details><summary>What does Pro for life include?</summary><p>Everything in Pro for one payment, and every update that comes after, new traditions included.</p></details>
+      <details><summary>What happens when the beta ends?</summary><p>Free keeps every tradition, motif, template and font. Pro features ask you to upgrade. Anything you made stays yours.</p></details>
+      <details><summary>Will it run on my old laptop?</summary><p>Yes. No install and no graphics card, just a browser from the last few years. It is at its best with a mouse or trackpad.</p></details>
+      <details><summary>Where do the traditions come from?</summary><p>Each is encoded from the visual rules of a living tradition, kept alive by communities of artists across India. If you love the look, find the artists and buy their work.</p></details>
     </div>
   </section>
 
   <!-- ============ LAST CALL ============ -->
   <section class="last" aria-labelledby="lastTitle">
-    <div class="wrap last-in">
-      <h2 id="lastTitle">Let's make a mark.</h2>
-      <a class="btn btn--turmeric btn--lg" data-editor href="../index.html">Start drawing, it's free</a>
+    <div class="last-card">
+      <h2 id="lastTitle">Your first peacock takes thirty seconds.</h2>
+      <a class="btn btn--night" data-editor href="../index.html"><span>Open the studio</span></a>
     </div>
-    <img class="chain" src="art/chain.svg" alt="" width="2400" height="200" loading="lazy">
   </section>
 </main>
 
 <footer class="foot">
-  <div class="wrap foot-in">
-    <a class="logo logo--light" href="#main" aria-label="Scrawl, back to top">
+  <div class="chain" aria-hidden="true"><div class="chain-track loop"><img src="art/chain.svg" alt="" width="2400" height="200" loading="lazy"><img src="art/chain.svg" alt="" width="2400" height="200" loading="lazy"></div></div>
+  <div class="foot-in">
+    <a class="logo" href="#main" aria-label="Scrawl, back to top">
       <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="7.5" r="3.4"/><path d="M8.5 12h15L16 19zM16 19l-7.5 8h15z"/></svg>
       <span>scrawl</span>
     </a>
+    <p class="foot-note">The rules are borrowed, the art belongs to its makers. Every picture on this page was drawn by Scrawl's own engine.</p>
     <nav aria-label="Footer">
-      <ul class="foot-links">
+      <ul class="foot-links mono">
         <li><a data-editor href="../index.html">Studio</a></li>
-        <li><a href="#traditions">Traditions</a></li>
-        <li><a href="#pricing">Pricing</a></li>
-        <li><a href="#faq">FAQ</a></li>
+        <li><a href="#rules">Rulebooks</a></li>
+        <li><a href="#pro">Pricing</a></li>
         <li><a href="https://github.com/Uttambakori/scrawl">GitHub</a></li>
       </ul>
     </nav>
-    <p class="foot-small">© <span id="year">2026</span> Scrawl. Every picture on this page was drawn by Scrawl's own engine.</p>
+    <p class="foot-small mono">© <span id="year">2026</span> Scrawl</p>
   </div>
 </footer>
 
+<script type="application/json" id="seq">[{"k":"warli","name":"Warli","where":"Maharashtra, India","rule":"No figure is larger than another.","g":"#B4603C","f":"#FCF7EE","a":"#EBD3B4","label":"Peacock, drawn by Scrawl in the Warli style"},{"k":"gond","name":"Gond","where":"Madhya Pradesh, India","rule":"The fill is the signature.","g":"#24402E","f":"#EFE6CE","a":"#E0A03C","label":"Great peacock, drawn by Scrawl in the Gond style"},{"k":"madhubani","name":"Madhubani","where":"Mithila, Bihar","rule":"No ground is left bare.","g":"#F2E6CC","f":"#1E1712","a":"#C8321E","label":"Peacock in display, drawn by Scrawl in the Madhubani style"},{"k":"pattachitra","name":"Pattachitra","where":"Puri, Odisha","rule":"The border is half the painting.","g":"#E1B13A","f":"#15100C","a":"#F4EEDC","label":"Great peacock, drawn by Scrawl in the Pattachitra style"},{"k":"kalamkari","name":"Kalamkari","where":"Srikalahasti, Andhra Pradesh","rule":"The pen draws. The dye decides.","g":"#223756","f":"#F1E4C6","a":"#C4553A","label":"Peacock, drawn by Scrawl in the Kalamkari style"},{"k":"sketch","name":"Sketchbook","where":"the original Scrawl library","rule":"Everything is drawn twice.","g":"#F2EDE4","f":"#141414","a":"#E01E37","label":"Crested bird, drawn by Scrawl in the Sketchbook style"}]</script>
 <script src="site.js" defer></script>
 </body>
 </html>
