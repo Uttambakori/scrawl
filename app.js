@@ -15,6 +15,7 @@
   const uid = () => (Date.now() % 1e7) * 1000 + Math.floor(Math.random() * 1000);
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const TYPE = S.TYPE;
+  const PLAN = S.PLAN;
 
   /* ---------------- a generator for hand-drawn custom paths ------------- */
   GENS.custom = {
@@ -1430,7 +1431,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     { const sb = $('#libSearch'); if (sb) sb.placeholder = 'Search ' + mine.length + ' pieces…'; }
     const list = q ? mine.filter(p => p.search.includes(q)) : mine.filter(p => p.cat === libCat);
     host.appendChild(el('div', 'libmeta', q ? `${list.length} match${list.length === 1 ? '' : 'es'}` : `${list.length} in ${libCat}`));
-    if (!q) { const st = S.styleOf(libStyle); if (st.note) host.appendChild(el('p', 'styleNote', st.note)); }
+    if (!q) { const st = S.styleOf(libStyle); if (st.note) { const n = el('p', 'styleNote', st.note); n.onclick = () => n.classList.toggle('full'); host.appendChild(n); } }
 
     const grid = el('div', 'libgrid');
     list.forEach(pre => {
@@ -1614,9 +1615,9 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     const w = el('div', 'seg' + (cls ? ' ' + cls : ''));
     opts.forEach(o => {
       const b = el('button', o.v === cur ? 'on' : '');
-      b.innerHTML = o.icon ? icon(o.icon, 15) : o.label; b.title = o.title || o.label || '';
+      b.innerHTML = (o.icon ? icon(o.icon, 15) : o.label) + (o.pro ? PLAN.badge(o.pro) : ''); b.title = o.title || o.label || '';
       if (o.disabled) b.disabled = true;
-      b.onclick = () => onPick(o.v);
+      b.onclick = () => o.pro && !PLAN.can(o.pro) ? PLAN.openUpgrade(o.pro) : onPick(o.v);
       w.appendChild(b);
     });
     return w;
@@ -1815,6 +1816,22 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     }
     host.appendChild(head);
 
+    /* --- alignment: to the board for one layer, to each other for several --- */
+    const ar = el('div', 'alignrow');
+    const one = items.length < 2;
+    [['alignL', 'l'], ['alignCH', 'cx'], ['alignR', 'r'], ['alignT', 't'], ['alignCV', 'cy'], ['alignB', 'b']].forEach(([id, m]) => {
+      const a = byId[id], b = el('button', 'ico');
+      b.innerHTML = icon(a.icon, 16); b.title = `${a.label}${one ? ' of board' : ''} — ${a.key}`;
+      b.onclick = () => { alignSel(m); refreshTransform(); }; ar.appendChild(b);
+    });
+    ar.appendChild(el('i', 'arsep'));
+    [['distH', 'h'], ['distV', 'v']].forEach(([id, m]) => {
+      const a = byId[id], b = el('button', 'ico');
+      b.innerHTML = icon(a.icon, 16); b.title = `${a.label} — ${a.key}`;
+      b.disabled = items.length < 3; b.onclick = () => { distributeSel(m); refreshTransform(); }; ar.appendChild(b);
+    });
+    host.appendChild(ar);
+
     /* --- position & size, measured from the board's corner --- */
     const gT = group(host, 'Position & size', 'transform', true);
     const bo = board() || { x: 0, y: 0 };
@@ -1989,6 +2006,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
 
   /* ---------------- clipboard ---------------- */
   async function copyAsSVG() {
+    if (!PLAN.can('vector')) return PLAN.openUpgrade('vector');
     stopEdit();
     const items = doc.items.filter(i => sel.has(i.id));
     const svg = await exportSVG(items.length ? items : null);
@@ -2016,6 +2034,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   function setBrand(b) { try { b ? localStorage.setItem(BKEY, JSON.stringify(b)) : localStorage.removeItem(BKEY); } catch (e) { } buildPalettes(); }
 
   function saveBrand() {
+    if (!PLAN.can('brandKit')) return PLAN.openUpgrade('brandKit');
     const heads = doc.items.filter(i => i.type === 'text');
     const b = {
       paper: doc.paper, colors: doc.colors.slice(),
@@ -2499,6 +2518,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   }
 
   function openPrint() {
+    if (!PLAN.can('print')) return PLAN.openUpgrade('print');
     const b = board();
     const o = { bleed: Math.round(Math.min(b.w, b.h) * .02), marks: 1, dpi: 300, format: 'pdf' };
     modal('Print setup', body => {
@@ -2761,6 +2781,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   }
   function toggleRulers() { prefs.rulers = prefs.rulers ? 0 : 1; savePrefs(); drawRulers(); toast(prefs.rulers ? 'Rulers on' : 'Rulers off'); }
   function toggleGuides() { prefs.guides = prefs.guides ? 0 : 1; savePrefs(); drawUI(); drawRulers(); toast(prefs.guides ? 'Guides shown' : 'Guides hidden'); }
+  function toggleStatus() { prefs.status = prefs.status ? 0 : 1; savePrefs(); document.body.classList.toggle('showstatus', !!prefs.status); updateStatus(); }
   function toggleLayout() { const L = layoutOf(); L.on = L.on ? 0 : 1; commit(); drawUI(); refreshPanels(); toast(L.on ? `Layout grid · ${L.cols} columns` : 'Layout grid off'); }
 
   /* ---------------- zoom ---------------- */
@@ -2789,14 +2810,16 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     const b = selBounds(items); zoomToRect({ x: b.x, y: b.y, w: b.r - b.x, h: b.b - b.y }, 120);
   }
   function zoomMenu() {
-    const r = $('#zoomLbl').getBoundingClientRect();
+    const top = $('#zoomTop'), below = !!(top && top.offsetParent);
+    const r = (below ? top : $('#zoomLbl')).getBoundingClientRect();
     const Z = (label, key, fn) => ({ label, key, fn });
     showMenu(r.left - 60, r.top - 8 - 330, [[
       Z('Zoom in', 'Ctrl +', () => zoomAt(view.z * 1.25)), Z('Zoom out', 'Ctrl −', () => zoomAt(view.z / 1.25))],
     [Z('50%', '', () => zoomAt(.5)), Z('100%', '⇧ 0', () => zoomAt(1)), Z('200%', '', () => zoomAt(2))],
     [Z('Fit everything', '⇧ 1', fitView), Z('Zoom to selection', '⇧ 2', zoomToSel), Z('Zoom to board', '⇧ 3', () => zoomToRect(board()))]]);
     const m = $('#ctxmenu'), mr = m.getBoundingClientRect();
-    m.style.top = Math.max(8, r.top - mr.height - 10) + 'px';
+    if (below) { m.style.top = (r.bottom + 6) + 'px'; m.style.left = Math.min(innerWidth - mr.width - 8, r.right - mr.width) + 'px'; }
+    else m.style.top = Math.max(8, r.top - mr.height - 10) + 'px';
   }
 
   /* ---------------- status & save state ---------------- */
@@ -2835,9 +2858,10 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     if (!host) {
       const pb = $('.palbox'); if (!pb) return;
       host = el('div', 'doccolors'); host.id = 'docColors';
-      pb.parentNode.insertBefore(host, pb.nextSibling);
+      pb.parentNode.insertBefore(host, pb);
     }
     host.innerHTML = '';
+    syncPalName();
     const head = el('div', 'dchead', '<span>File colours</span>');
     const inv = el('button', 'ico'); inv.innerHTML = icon('refresh', 14); inv.title = 'Swap ink and paper';
     inv.onclick = () => { const t = doc.colors[0]; doc.colors[0] = doc.paper; setSlot(4, t); commit(); render(); buildPalettes(); buildLibrary(); refreshPanels(); };
@@ -3067,6 +3091,10 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     stopEdit();
     const o = exportPrefs(); o.name = slug();
     if (o.scope === 'selection' && !sel.size) o.scope = 'board';
+    // a free plan never starts on an option it cannot use
+    if (!PLAN.can('vector') && (o.fmt === 'svg' || o.fmt === 'pdf')) o.fmt = 'png';
+    if (!PLAN.can('hiresExport') && o.scale > 2) o.scale = 2;
+    if (!PLAN.can('transparent')) o.clear = 0;
     modal('Export', body => {
       const grid = el('div', 'exgrid');
       const prev = el('div', 'exprev'), side = el('div', 'exopts');
@@ -3087,17 +3115,17 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
         side.innerHTML = '';
         const lab = t => el('div', 'exlab', t);
         side.appendChild(lab('Format'));
-        side.appendChild(seg(Object.entries(FMT).map(([k, v]) => ({ v: k, label: v[0] })), o.fmt, v => { o.fmt = v; draw(); }, 'wide'));
+        side.appendChild(seg(Object.entries(FMT).map(([k, v]) => ({ v: k, label: v[0], pro: k === 'svg' || k === 'pdf' ? 'vector' : '' })), o.fmt, v => { o.fmt = v; draw(); }, 'wide'));
         if (o.fmt !== 'svg') {
           side.appendChild(lab('Size'));
-          side.appendChild(seg([.5, 1, 2, 3, 4].map(v => ({ v, label: v + '×' })), o.scale, v => { o.scale = v; draw(); }, 'wide'));
+          side.appendChild(seg([.5, 1, 2, 3, 4].map(v => ({ v, label: v + '×', pro: v > 2 ? 'hiresExport' : '' })), o.scale, v => { o.scale = v; draw(); }, 'wide'));
         }
         side.appendChild(lab('What'));
         side.appendChild(seg([{ v: 'board', label: 'This board' }, { v: 'all', label: `All boards (${doc.boards.length})`, disabled: doc.boards.length < 2 },
           { v: 'selection', label: 'Selection', disabled: !sel.size }], o.scope, v => { o.scope = v; draw(); }, 'wide'));
         if (o.fmt === 'png' || o.fmt === 'webp' || o.fmt === 'svg') {
           side.appendChild(lab('Background'));
-          side.appendChild(seg([{ v: 0, label: 'Paper' }, { v: 1, label: 'Transparent' }], o.clear ? 1 : 0, v => { o.clear = v; draw(); }, 'wide'));
+          side.appendChild(seg([{ v: 0, label: 'Paper' }, { v: 1, label: 'Transparent', pro: 'transparent' }], o.clear ? 1 : 0, v => { o.clear = v; draw(); }, 'wide'));
         }
         if (o.fmt === 'jpg' || o.fmt === 'webp') side.appendChild(ctrlNum('Quality', o.quality, .5, 1, .01, v => { o.quality = v; }));
         side.appendChild(lab('File name'));
@@ -3122,9 +3150,9 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
         go.onclick = () => { closeModal(); runExport(Object.assign({}, o)); };
         side.appendChild(go);
         const more = el('div', 'exmore');
-        [['Print with bleed…', 'frame', () => { closeModal(); openPrint(); }], ['Copy as SVG', 'copy', () => { closeModal(); copyAsSVG(); }],
-          ['Project file', 'file', () => { closeModal(); doExport('json'); }]].forEach(([t, ic, fnc]) => {
-          const b = el('button', 'ghost', `${icon(ic, 14)}<span>${t}</span>`); b.onclick = fnc; more.appendChild(b);
+        [['Print with bleed…', 'frame', () => { closeModal(); openPrint(); }, 'print'], ['Copy as SVG', 'copy', () => { closeModal(); copyAsSVG(); }, 'vector'],
+          ['Project file', 'file', () => { closeModal(); doExport('json'); }]].forEach(([t, ic, fnc, pro]) => {
+          const b = el('button', 'ghost', `${icon(ic, 14)}<span>${t}</span>${pro ? PLAN.badge(pro) : ''}`); b.onclick = fnc; more.appendChild(b);
         });
         side.appendChild(more);
       };
@@ -3185,9 +3213,9 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     '-',
     { id: 'export', menu: 'File', label: 'Export…', icon: 'download', key: 'Ctrl E', run: openExport },
     { id: 'exportAgain', menu: 'File', label: 'Export again', key: 'Ctrl Shift E', run: exportAgain },
-    { id: 'print', menu: 'File', label: 'Print with bleed & crop marks…', icon: 'frame', key: 'Ctrl P', run: () => openPrint() },
+    { id: 'print', menu: 'File', label: 'Print with bleed & crop marks…', icon: 'frame', key: 'Ctrl P', pro: 'print', run: () => openPrint() },
     '-',
-    { id: 'brand', menu: 'File', label: 'Save colours & fonts as brand kit', icon: 'swatch', run: () => saveBrand() },
+    { id: 'brand', menu: 'File', label: 'Save colours & fonts as brand kit', icon: 'swatch', pro: 'brandKit', run: () => saveBrand() },
     // Edit
     { id: 'undo', menu: 'Edit', label: 'Undo', icon: 'undo', key: 'Ctrl Z', run: () => undo(), enabled: () => hi > 0 },
     { id: 'redo', menu: 'Edit', label: 'Redo', icon: 'redo', key: 'Ctrl Shift Z', run: () => redo(), enabled: () => hi < history.length - 1 },
@@ -3201,7 +3229,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     '-',
     { id: 'copyStyle', menu: 'Edit', label: 'Copy style', key: 'Ctrl Alt C', run: copyStyle, enabled: hasSel },
     { id: 'pasteStyle', menu: 'Edit', label: 'Paste style', key: 'Ctrl Alt V', run: pasteStyle, enabled: () => hasSel() && !!styleClip },
-    { id: 'copySvg', menu: 'Edit', label: 'Copy as SVG', icon: 'code', key: 'Ctrl Shift C', run: () => copyAsSVG() },
+    { id: 'copySvg', menu: 'Edit', label: 'Copy as SVG', icon: 'code', key: 'Ctrl Shift C', pro: 'vector', run: () => copyAsSVG() },
     '-',
     { id: 'selectAll', menu: 'Edit', label: 'Select all', key: 'Ctrl A', run: () => { sel.clear(); doc.items.forEach(i => { if (!i.hidden && !i.locked) sel.add(i.id); }); render(); refreshPanels(); } },
     { id: 'deselect', menu: 'Edit', label: 'Select none', key: 'Ctrl Shift A', run: () => { sel.clear(); render(); refreshPanels(); }, enabled: hasSel },
@@ -3257,6 +3285,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     { id: 'guides', menu: 'View', label: 'Guides', icon: 'guide', key: 'Ctrl ;', run: toggleGuides, checked: () => !!prefs.guides },
     { id: 'clearGuides', menu: 'View', label: 'Clear guides', run: clearGuides, enabled: () => !!(doc.guides && doc.guides.length) },
     { id: 'layout', menu: 'View', label: 'Layout grid', icon: 'layout', key: 'Shift G', run: toggleLayout, checked: () => !!(doc.layout && doc.layout.on) },
+    { id: 'status', menu: 'View', label: 'Status bar', icon: 'ruler', run: toggleStatus, checked: () => !!prefs.status },
     { id: 'snap', menu: 'View', label: 'Snapping', icon: 'magnet', key: "Ctrl '", run: () => $('#btnSnap').click(), checked: () => snapOn },
     '-',
     { id: 'showLib', menu: 'View', label: 'Library', icon: 'grid', key: 'Alt 1', run: () => setLeftTab('lib'), checked: () => $('#left').dataset.tab === 'lib' },
@@ -3277,6 +3306,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     // Help
     { id: 'palette', menu: 'Help', label: 'Search commands…', icon: 'command', key: 'Ctrl K', run: () => S.openCommands && S.openCommands() },
     { id: 'keys', menu: 'Help', label: 'Keyboard shortcuts', icon: 'keyboard', key: 'Ctrl /', run: () => openShortcuts() },
+    { id: 'pro', menu: 'Help', label: 'Motifs Pro…', icon: 'sparkle', run: () => PLAN.openUpgrade() },
   ];
   const ACTIONS = A.filter(a => a !== '-');
   const byId = {}; ACTIONS.forEach(a => { byId[a.id] = a; });
@@ -3355,6 +3385,48 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     setLeftTab(t);
   }
 
+  /* ---------------- quiet chrome ----------------
+     The desktop layout keeps only what is used every minute on screen:
+     the zoom readout moves up beside Export, the palette folds away
+     under the file colours, and the status bar waits in the View menu. */
+  function quietChrome() {
+    const zt = $('#zoomTop'), zl = $('#zoomLbl');
+    if (zt) {
+      zt.innerHTML = `<span class="zv"></span>${icon('chevD', 12)}`;
+      const sync = () => { zt.firstChild.textContent = zl.textContent; };
+      sync(); new MutationObserver(sync).observe(zl, { childList: true, characterData: true, subtree: true });
+      zt.onclick = zoomMenu;
+    }
+    const pro = $('#btnPro');
+    if (pro) {
+      const t = PLAN.tier();
+      pro.hidden = t === 'pro';
+      pro.innerHTML = `${icon('sparkle', 14)}<span>${t === 'free' ? 'Upgrade' : 'Pro'}</span>`;
+      pro.title = t === 'free' ? 'Motifs Pro — $9 a month or $49 once' : 'Motifs Pro is free while in beta';
+      pro.onclick = () => PLAN.openUpgrade();
+    }
+    document.body.classList.toggle('showstatus', !!prefs.status);
+    // right panel: a colour section that folds, and no second heading
+    const heads = $$('#right > .phead');
+    if (heads[1]) heads[1].classList.add('propshead');
+    const ph = heads[0];
+    if (ph && !ph.querySelector('.palname')) {
+      const tt = ph.querySelector('.ttl');
+      tt.classList.add('paltoggle'); tt.setAttribute('role', 'button'); tt.tabIndex = 0;
+      const open = () => { try { return localStorage.getItem('scrawl.palopen') !== '0'; } catch (e) { return true; } };
+      const sync = () => { $('#right').classList.toggle('palclosed', !open()); tt.title = open() ? 'Fold palettes away' : 'Show palettes'; };
+      tt.innerHTML = `${icon('chevD', 13, 'class="ic caret"')}<span>Colours</span><em class="palname"></em>`;
+      tt.onclick = () => { try { localStorage.setItem('scrawl.palopen', open() ? '0' : '1'); } catch (e) { } sync(); };
+      tt.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tt.click(); } };
+      sync();
+    }
+  }
+  function syncPalName() {
+    const n = $('#right .palname'); if (!n) return;
+    const pal = doc.palIdx >= 0 ? S.stylePalettes(libStyle)[doc.palIdx] : null;
+    n.textContent = pal ? pal[0] : doc.palIdx === -1 && brand() ? 'Brand kit' : 'Custom';
+  }
+
   function bindStudio() {
     const vp = $('#viewport');
     dockLayers();
@@ -3366,6 +3438,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     $('#btnZoomIn').onclick = () => zoomAt(view.z * 1.25);
     $('#btnZoomOut').onclick = () => zoomAt(view.z / 1.25);
     $('#zoomLbl').onclick = zoomMenu; $('#zoomLbl').title = 'Zoom options';
+    quietChrome();
     $('#themeBtn').addEventListener('click', () => { drawRulers(); drawUI(); });
     $('#btnCmd') && ($('#btnCmd').onclick = () => runAction('palette'));
     // drop files, or pieces dragged out of the library, straight onto the canvas

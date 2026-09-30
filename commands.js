@@ -1,8 +1,8 @@
 /* ============================================================
-   SCRAWL / commands — menu bar, command search, tooltips
+   SCRAWL / commands — main menu, command search, tooltips
    ------------------------------------------------------------
    Everything here reads the one action list app.js publishes as
-   SCRAWL.studio, so a command added there shows up in the menus,
+   SCRAWL.studio, so a command added there shows up in the menu,
    in the search and on the keyboard at once.
    ============================================================ */
 (function () {
@@ -12,76 +12,116 @@
   let ST = null;
 
   /* ==========================================================
-     MENU BAR
-     Click a title to open it; once one is open, moving across the
-     bar switches menus, the way a desktop menu bar behaves.
+     MAIN MENU
+     One quiet button — the mark in the corner — holds every menu,
+     the way Figma does it: File, Edit, Object, Type, View and Help
+     open to the side on hover or with the arrow keys.
      ========================================================== */
-  let openMenu = null, drop = null, hi = -1;
-
-  function buildBar() {
-    const bar = $('#menubar'); if (!bar) return;
-    bar.innerHTML = '';
-    ST.menus.forEach(([name]) => {
-      const b = document.createElement('button');
-      b.className = 'mbtn'; b.textContent = name; b.dataset.menu = name;
-      b.onpointerdown = e => { e.preventDefault(); openMenu === name ? closeMenus() : showMenu(name); };
-      b.onmouseenter = () => { if (openMenu && openMenu !== name) showMenu(name); };
-      bar.appendChild(b);
-    });
-  }
+  let main = null, sub = null, subName = null, col = 'main', hiM = -1, hiS = -1;
+  const isOpen = () => !!main;
 
   function rowsFor(name) {
     const m = ST.menus.find(x => x[0] === name);
     return m ? m[1] : [];
   }
+  function item(lead, label, key, extra) {
+    const b = document.createElement('button');
+    b.className = 'ctxitem';
+    b.innerHTML = `${lead}<span>${esc(label)}</span>${extra || ''}${key ? `<kbd>${esc(ST.fmtKey(key))}</kbd>` : ''}`;
+    return b;
+  }
+  function actionRow(id, onDone) {
+    const a = ST.byId[id];
+    const on = a.checked ? a.checked() : null;
+    const lead = on !== null ? (on ? S.icon('check', 15) : '<i class="icspace"></i>') : (a.icon ? S.icon(a.icon, 15) : '<i class="icspace"></i>');
+    const b = item(lead, a.label, a.key, a.pro && S.PLAN ? S.PLAN.badge(a.pro) : '');
+    if (on) b.classList.add('checked');
+    if (a.enabled && !a.enabled()) b.disabled = true;
+    b.onclick = () => { closeMenus(); onDone && onDone(); ST.run(id); };
+    return b;
+  }
+  const sepRow = () => Object.assign(document.createElement('div'), { className: 'ctxsep' });
 
-  function showMenu(name) {
-    closeMenus(true);
-    const anchor = $(`#menubar [data-menu="${name}"]`); if (!anchor) return;
-    openMenu = name; anchor.classList.add('on');
-    drop = document.createElement('div');
-    drop.className = 'mdrop';
-    rowsFor(name).forEach(id => {
-      if (id === '-') { drop.appendChild(Object.assign(document.createElement('div'), { className: 'ctxsep' })); return; }
-      const a = ST.byId[id];
-      const on = a.checked ? a.checked() : null;
-      const b = document.createElement('button');
-      b.className = 'ctxitem' + (on ? ' checked' : '');
-      b.dataset.id = id;
-      const lead = on !== null ? (on ? S.icon('check', 15) : '<i class="icspace"></i>') : (a.icon ? S.icon(a.icon, 15) : '<i class="icspace"></i>');
-      b.innerHTML = `${lead}<span>${esc(a.label)}</span>${a.key ? `<kbd>${esc(ST.fmtKey(a.key))}</kbd>` : ''}`;
-      if (a.enabled && !a.enabled()) b.disabled = true;
-      b.onclick = () => { closeMenus(); ST.run(id); };
-      b.onmouseenter = () => setHi([...drop.querySelectorAll('.ctxitem')].indexOf(b));
-      drop.appendChild(b);
+  function openMain() {
+    closeMenus();
+    const anchor = $('header .brand'); if (!anchor) return;
+    anchor.classList.add('on');
+    main = document.createElement('div');
+    main.className = 'mdrop mmain';
+    const add = (b, run) => { if (run) b.onclick = () => { closeMenus(); run(); }; main.appendChild(b); return b; };
+    add(item(S.icon('files', 15), 'Back to files', 'Ctrl Shift O'), () => ST.run('files'));
+    add(item(S.icon('plus', 15), 'New from template', 'Alt N'), () => ST.run('new'));
+    main.appendChild(sepRow());
+    ST.menus.forEach(([name]) => {
+      const b = add(item('<i class="icspace"></i>', name, '', S.icon('chevR', 14, 'class="ic subcaret"')));
+      b.classList.add('hassub'); b.dataset.menu = name;
+      b.onclick = () => openSub(name, true);
+      b.onmouseenter = () => { setHi('main', rowsOf(main).indexOf(b)); openSub(name); };
     });
-    document.body.appendChild(drop);
+    main.appendChild(sepRow());
+    add(item(S.icon('command', 15), 'Search commands', 'Ctrl K'), () => ST.run('palette'));
+    add(item(S.icon('keyboard', 15), 'Keyboard shortcuts', 'Ctrl /'), () => ST.run('keys'));
+    if (S.PLAN) add(item(S.icon('sparkle', 15), 'Motifs Pro', '', `<small class="mtier">${{ beta: 'Free in beta', free: 'Upgrade', pro: 'Active' }[S.PLAN.tier()]}</small>`), () => S.PLAN.openUpgrade());
+    rowsOf(main).forEach(b => { if (!b.classList.contains('hassub')) b.addEventListener('mouseenter', () => { setHi('main', rowsOf(main).indexOf(b)); closeSub(); }); });
+    document.body.appendChild(main);
     const r = anchor.getBoundingClientRect();
-    drop.style.left = Math.min(r.left, innerWidth - drop.offsetWidth - 8) + 'px';
-    drop.style.top = (r.bottom + 4) + 'px';
-    hi = -1;
+    main.style.left = Math.max(6, r.left) + 'px';
+    main.style.top = (r.bottom + 6) + 'px';
+    col = 'main'; hiM = -1;
   }
-  function closeMenus(keepState) {
-    if (drop) { drop.remove(); drop = null; }
-    document.querySelectorAll('#menubar .mbtn.on').forEach(b => b.classList.remove('on'));
-    if (!keepState) openMenu = null;
+  function openSub(name, focus) {
+    if (subName === name && sub) { if (focus) { col = 'sub'; setHi('sub', firstOn(sub)); } return; }
+    closeSub();
+    const anchor = main && main.querySelector(`[data-menu="${name}"]`); if (!anchor) return;
+    anchor.classList.add('open');
+    subName = name;
+    sub = document.createElement('div');
+    sub.className = 'mdrop msub';
+    rowsFor(name).forEach(id => {
+      if (id === '-') { sub.appendChild(sepRow()); return; }
+      const b = actionRow(id);
+      b.onmouseenter = () => { col = 'sub'; setHi('sub', rowsOf(sub).indexOf(b)); };
+      sub.appendChild(b);
+    });
+    document.body.appendChild(sub);
+    const r = anchor.getBoundingClientRect(), mr = main.getBoundingClientRect();
+    const left = mr.right + sub.offsetWidth + 4 < innerWidth ? mr.right + 2 : mr.left - sub.offsetWidth - 2;
+    sub.style.left = left + 'px';
+    sub.style.top = Math.max(6, Math.min(innerHeight - sub.offsetHeight - 8, r.top - 5)) + 'px';
+    hiS = -1;
+    if (focus) { col = 'sub'; setHi('sub', firstOn(sub)); }
   }
-  function setHi(i) {
-    const items = [...drop.querySelectorAll('.ctxitem')];
-    items.forEach((b, k) => b.classList.toggle('hi', k === i));
-    hi = i;
+  function closeSub() {
+    if (sub) { sub.remove(); sub = null; }
+    if (main) main.querySelectorAll('.hassub.open').forEach(b => b.classList.remove('open'));
+    subName = null; hiS = -1;
+  }
+  function closeMenus() {
+    closeSub();
+    if (main) { main.remove(); main = null; }
+    document.querySelectorAll('header .brand.on').forEach(b => b.classList.remove('on'));
+    col = 'main'; hiM = -1;
+  }
+  const rowsOf = d => d ? [...d.querySelectorAll('.ctxitem')] : [];
+  const firstOn = d => rowsOf(d).findIndex(b => !b.disabled);
+  function setHi(which, i) {
+    const d = which === 'main' ? main : sub;
+    rowsOf(d).forEach((b, k) => b.classList.toggle('hi', k === i));
+    if (which === 'main') hiM = i; else hiS = i;
   }
   function menuKeys(e) {
-    if (!openMenu) return;
-    const items = drop ? [...drop.querySelectorAll('.ctxitem')] : [];
-    const names = ST.menus.map(m => m[0]);
-    const move = d => { let i = hi; for (let n = 0; n < items.length; n++) { i = (i + d + items.length) % items.length; if (!items[i].disabled) break; } setHi(i); };
+    if (!main) return;
+    const d = col === 'sub' && sub ? sub : main, rows = rowsOf(d);
+    const cur = d === sub ? hiS : hiM;
+    const move = k => { let i = cur; for (let n = 0; n < rows.length; n++) { i = (i + k + rows.length) % rows.length; if (!rows[i].disabled) break; } setHi(d === sub ? 'sub' : 'main', i); if (d === main) closeSub(); };
     const stop = () => { e.preventDefault(); e.stopImmediatePropagation(); };
-    if (e.key === 'Escape') { stop(); closeMenus(); }
+    if (e.key === 'Escape') { stop(); if (col === 'sub' && sub) { closeSub(); col = 'main'; } else closeMenus(); }
     else if (e.key === 'ArrowDown') { stop(); move(1); }
     else if (e.key === 'ArrowUp') { stop(); move(-1); }
-    else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { stop(); const i = names.indexOf(openMenu); showMenu(names[(i + (e.key === 'ArrowRight' ? 1 : -1) + names.length) % names.length]); }
-    else if (e.key === 'Enter' && items[hi]) { stop(); items[hi].click(); }
+    else if (e.key === 'ArrowRight') { stop(); const r = rows[cur]; if (d === main && r && r.dataset.menu) openSub(r.dataset.menu, true); }
+    else if (e.key === 'ArrowLeft') { stop(); if (d === sub) { closeSub(); col = 'main'; } }
+    else if (e.key === 'Enter') { stop(); if (rows[cur]) rows[cur].click(); }
+    else stop();
   }
 
   /* ==========================================================
@@ -225,16 +265,26 @@
 
   /* ---------------- wiring ---------------- */
   S.openCommands = openCommands;
+  S.openMainMenu = openMain;
+  S.menuOpen = isOpen;
   S.initStudioUI = studio => {
     ST = studio;
-    buildBar();
     bindTips();
+    const brand = $('header .brand');
+    if (brand) {
+      brand.setAttribute('role', 'button'); brand.tabIndex = 0;
+      brand.title = 'Menu';
+      brand.insertAdjacentHTML('beforeend', S.icon('chevD', 12, 'class="ic brandcaret"'));
+      brand.onclick = null; // it used to go straight to your files; that is now the menu's first row
+      brand.onpointerdown = e => { e.preventDefault(); main ? closeMenus() : openMain(); };
+      brand.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMain(); setHi('main', 0); } };
+    }
     const k = $('#cmdKey'); if (k) k.textContent = ST.fmtKey('Ctrl K');
     addEventListener('keydown', menuKeys, true);
     addEventListener('pointerdown', e => {
-      if (!openMenu) return;
+      if (!main) return;
       const t = e.target;
-      if (t instanceof Element && (t.closest('.mdrop') || t.closest('#menubar'))) return;
+      if (t instanceof Element && (t.closest('.mdrop') || t.closest('header .brand'))) return;
       closeMenus();
     }, true);
     addEventListener('blur', () => closeMenus());

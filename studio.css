@@ -1,7 +1,7 @@
 /* ============================================================
    SCRAWL / studio.css — the desktop layer
    Loaded after the base styles in index.html and only adds to
-   them: the menu bar, rulers, the type panel, the font library,
+   them: the main menu, rulers, the type panel, the font library,
    command search, export and the smaller refinements.
    ============================================================ */
 :root{
@@ -11,12 +11,16 @@
 }
 :root[data-theme="dark"]{ --guide2:#F06BB5; --colfill:rgba(240,107,138,.14); --ok:#5CC48A; }
 
-/* ---------- header ---------- */
+/* ---------- header ----------
+   One quiet row: the mark (which opens every menu), the file, and on
+   the right only search, theme, zoom and Export. Everything else lives
+   in the menu, the command search, the panel or on a key. */
 header{gap:2px}
-.menubar{display:flex;align-items:center;gap:0;margin-right:2px}
-.mbtn{padding:5px 8px;font:500 12.5px 'DM Sans';color:var(--txt);border-radius:6px}
-.mbtn:hover,.mbtn.on{background:var(--hover)}
-.mbtn.on{background:var(--sunk);box-shadow:inset 0 0 0 1px var(--line)}
+header .brand{cursor:pointer;padding:5px 7px 5px 6px;margin:0 4px 0 -2px;border-radius:8px;gap:6px;transition:background .11s}
+header .brand:hover,header .brand.on{background:var(--hover)}
+header .brand.on{box-shadow:inset 0 0 0 1px var(--line)}
+header .brand:focus-visible{outline:none;box-shadow:var(--focus)}
+.brandcaret{color:var(--dim);margin-left:-1px}
 #btnHome span,#btnNew span{display:none}
 #btnHome,#btnNew{padding:6px 7px;border-color:transparent}
 #btnHome:hover,#btnNew:hover{border-color:var(--line)}
@@ -30,8 +34,39 @@ header{gap:2px}
 .cmdbtn:hover{background:var(--panel);border-color:var(--line2);color:var(--txt)}
 .cmdbtn .cmdtxt{flex:1;text-align:left;font-weight:400}
 .cmdbtn kbd{font-size:10.5px;padding:1px 6px;border-bottom-width:1px;color:var(--dim)}
-@media (max-width:1380px){.cmdbtn{min-width:0}.cmdbtn .cmdtxt,.cmdbtn kbd{display:none}}
+.zoomtop{font:500 12px 'DM Sans';color:var(--txt);padding:6px 6px 6px 9px;gap:3px;min-width:64px;justify-content:space-between;font-variant-numeric:tabular-nums}
+.zoomtop .ic{color:var(--dim)}
+.prochip{font:600 11.5px 'DM Sans';gap:5px;padding:5px 10px 5px 8px;border-radius:99px;color:var(--txt);
+  background:linear-gradient(var(--panel),var(--panel)) padding-box,linear-gradient(120deg,#E8A33D,#D2432B 55%,#8E4BD6) border-box;border:1px solid transparent}
+.prochip .ic{color:#D2432B}
+.prochip:hover{background:linear-gradient(var(--hover),var(--hover)) padding-box,linear-gradient(120deg,#E8A33D,#D2432B 55%,#8E4BD6) border-box}
+.prochip[hidden]{display:none}
+@media (min-width:1025px){
+  /* moved to the panel, the menu or a key */
+  header>.sep,header [data-align],header [data-dist],#btnGroup,#btnUngroup,#btnKeys,#btnImport,#btnNew{display:none}
+  header{padding:0 10px 0 8px}
+  #btnUndo{margin-left:6px}
+  #btnExport{margin-left:6px;padding:6px 14px}
+  .cmdbtn{min-width:0;padding:6px 8px;border-color:transparent;background:transparent}
+  .cmdbtn:hover{background:var(--hover);border-color:transparent}
+  .cmdbtn .cmdtxt{display:none}
+  .cmdbtn kbd{background:var(--sunk);border-color:var(--line)}
+  /* the dock keeps tools; zoom lives in the header */
+  .dock>div.sep:nth-of-type(2),#btnZoomOut,#zoomLbl,#btnZoomIn,#btnFit{display:none}
+  #btnSurprise span{display:none}
+  #btnSurprise{padding:6px;min-width:30px;justify-content:center}
+}
+@media (max-width:1024px){.zoomtop,.prochip{display:none}}
 @media (max-width:1240px){#saveState{font-size:0;gap:0;margin:0 4px 0 -4px}}
+
+/* the main menu and its side menus */
+.mmain{min-width:236px}
+.mmain .ctxitem>span{flex:1;text-align:left}
+.mmain .ctxitem .subcaret{margin-left:auto;color:var(--dim)}
+.mmain .ctxitem .mtier+kbd{display:none}
+.mmain .ctxitem.hassub.open{background:var(--hover)}
+.mmain .mtier{margin-left:auto;font:500 10.5px 'DM Sans';color:var(--dim)}
+.msub{animation:none}
 
 /* dropdown menus share the context menu's look */
 .mdrop{position:fixed;z-index:62;min-width:250px;background:var(--panel);border:1px solid var(--line);
@@ -65,6 +100,7 @@ body.rulers #toast,body.rulers .hintpill{top:34px}
 #status b{color:var(--txt);font-weight:600;margin-left:3px}
 body.rulers #status{left:32px}
 @media (max-width:1180px){#status .stpos{display:none}}
+@media (min-width:1025px){body:not(.showstatus) #status{display:none}}
 #viewport.dropping{box-shadow:inset 0 0 0 3px var(--accent)}
 #viewport.dropping::after{content:'Drop to place';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   background:var(--accent);color:#fff;font:600 13px 'DM Sans';padding:9px 16px;border-radius:99px;pointer-events:none;z-index:8}
@@ -240,3 +276,68 @@ textarea.copy{font:13px/1.45 'DM Sans',sans-serif}
 .filecard>:not(.filemore){width:100%;min-width:0}
 #zoomLbl{cursor:pointer;border-radius:6px;padding:4px 2px}
 #zoomLbl:hover{background:var(--hover);color:var(--txt)}
+
+/* ---------- quiet panels ----------
+   The right panel reads top to bottom as: the file's colours, then
+   whatever is selected. Palettes fold away under the colours. */
+@media (min-width:1025px){
+  #right .propshead{display:none}
+  #right>.phead:first-child{padding:6px 8px 6px 6px;border-bottom:0}
+  .paltoggle{display:flex;align-items:center;gap:5px;flex:1;min-width:0;cursor:pointer;padding:5px 6px;border-radius:6px;color:var(--txt) !important;font-weight:600 !important}
+  .paltoggle:hover{background:var(--hover)}
+  .paltoggle .caret{color:var(--dim);transition:transform .15s var(--ease)}
+  #right.palclosed .paltoggle .caret{transform:rotate(-90deg)}
+  .paltoggle .palname{font:400 11px 'DM Sans';font-style:normal;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #right.palclosed .palbox,#right.palclosed #brandbar{display:none}
+  #right .doccolors{border-bottom:1px solid var(--line)}
+  #right:not(.palclosed) .doccolors{border-bottom:0}
+  #right .palbox{border-top:1px solid var(--line)}
+}
+.alignrow{display:flex;align-items:center;gap:1px;padding:4px 8px 6px;border-bottom:1px solid var(--line)}
+.alignrow button.ico{flex:1;min-width:0;padding:6px 0;color:var(--dim)}
+.alignrow button.ico:hover{color:var(--txt)}
+.alignrow .arsep{width:1px;height:16px;background:var(--line);margin:0 3px;flex:none}
+
+/* library: one row of categories that scrolls, and a two-line note */
+@media (min-width:1025px){
+  #lib .chips{flex-wrap:nowrap;overflow-x:auto;margin:0 -11px 10px;padding:0 11px 2px;scrollbar-width:none;
+    -webkit-mask:linear-gradient(90deg,transparent,#000 11px,#000 calc(100% - 22px),transparent)}
+  #lib .chips::-webkit-scrollbar{display:none}
+  #lib .chip{flex:none}
+  .styleNote{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:help}
+  .styleNote.full{display:block}
+}
+
+/* ---------- Pro ---------- */
+.probadge{display:inline-flex;align-items:center;font:700 8.5px/1 'DM Sans';letter-spacing:.06em;text-transform:uppercase;
+  padding:3px 5px 2px;border-radius:4px;color:#fff;background:linear-gradient(120deg,#E8A33D,#D2432B 55%,#8E4BD6);flex:none;margin-left:6px}
+.probadge.big{font-size:10px;padding:4px 7px 3px;margin:0}
+.seg .probadge{margin-left:4px;padding:2px 4px 1px;font-size:7.5px}
+.ctxitem .probadge{margin-left:8px}
+.ctxitem>.probadge:first-child{margin:0;width:15px;justify-content:center;padding:3px 0 2px;font-size:7px}
+#upgrade{position:fixed;inset:0;z-index:90;background:rgba(20,18,15,.38);display:grid;place-items:center;padding:24px;animation:fadein .14s}
+@keyframes fadein{from{opacity:0}}
+.upsheet{position:relative;width:min(640px,100%);max-height:calc(100vh - 48px);overflow:auto;background:var(--panel);border:1px solid var(--line);
+  border-radius:16px;box-shadow:var(--pop);padding:28px 28px 24px;animation:drop .18s var(--ease)}
+.upx{position:absolute;top:12px;right:12px}
+.uphead h3{font:600 24px/1.15 'DM Sans';letter-spacing:-.02em;margin:12px 0 6px}
+.uphead p{margin:0;color:var(--dim);font-size:13.5px;max-width:46ch}
+.upwhy{display:flex;align-items:center;gap:8px;margin:16px 0 0;padding:9px 12px;border-radius:9px;background:var(--sunk);font-size:12.5px}
+.upcols{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0}
+.upfeat h4{margin:0 0 8px;font:600 11px 'DM Sans';letter-spacing:.04em;text-transform:uppercase;color:var(--dim)}
+.upfeat ul{list-style:none;margin:0;padding:0;display:grid;gap:7px}
+.upfeat li{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.4}
+.upfeat li .ic{margin-top:1px;color:var(--dim)}
+.upfeat.pro li .ic{color:#D2432B}
+.upplans{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.upplan{position:relative;border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:4px}
+.upplan.best{border-color:transparent;background:linear-gradient(var(--panel),var(--panel)) padding-box,linear-gradient(120deg,#E8A33D,#D2432B 55%,#8E4BD6) border-box;border:1.5px solid transparent}
+.upplan em{position:absolute;top:-9px;right:12px;font:600 10px 'DM Sans';font-style:normal;background:var(--txt);color:var(--app);padding:3px 8px;border-radius:99px}
+.upplan b{font:600 13px 'DM Sans'}
+.upprice{display:flex;align-items:baseline;gap:5px}
+.upprice span{font:600 30px/1.1 'DM Sans';letter-spacing:-.03em}
+.upprice small{color:var(--dim);font-size:12px}
+.upplan p{margin:0 0 10px;color:var(--dim);font-size:12px}
+.upplan button,.upbuy{margin-top:auto;justify-content:center;width:100%}
+.upbuy{display:flex;padding:8px;border-radius:var(--r);background:var(--txt);color:var(--app);text-decoration:none;font:600 12.5px 'DM Sans'}
+@media (max-width:560px){.upcols,.upplans{grid-template-columns:1fr}}
