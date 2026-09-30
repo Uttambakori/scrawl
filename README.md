@@ -324,3 +324,15 @@ silently blowing the quota.
 
 It's static. Drop the folder on Netlify, Vercel, GitHub Pages, or any host.
 Nothing runs server-side and nothing leaves the browser.
+
+## The website
+
+`site/` is Scrawl's marketing page. It has no art assets of its own: it loads
+the editor's engine and packs from the repository root and draws every
+illustration live, so it is always in step with the library. Traditions,
+palettes, piece counts and templates are read from the loaded packs, so a new
+tradition appears on the site once its `<script>` tags are added to both
+`index.html` and `site/index.html`.
+
+Serve the repository root (for GitHub Pages: deploy from the `main` branch,
+root folder) and open `/site/`. Its "Open the editor" links point at `../index.html`.

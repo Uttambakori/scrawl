@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Scrawl · Pattern from a rule</title>
+<meta name="description" content="Scrawl paints Warli, Gond and sketchbook art from a number. Every mark is generated from seeded rules, in your browser, as clean SVG.">
+<meta property="og:title" content="Scrawl · Pattern from a rule">
+<meta property="og:description" content="A drawing machine for Indian folk art traditions. Change the number, get a hand that has never drawn before.">
+<meta name="theme-color" content="#9E4B33">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%239E4B33'/%3E%3Ccircle cx='16' cy='7.5' r='3.2' fill='%23FAF5EC'/%3E%3Cpath d='M9 11.5h14L16 18zM16 18l-7 7h14z' fill='%23FAF5EC'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,700;12..96,800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&family=Bebas+Neue&family=Anton&family=Archivo+Black&family=Playfair+Display:wght@700&family=Caveat:wght@700&family=Chivo+Mono:wght@500&family=Alfa+Slab+One&family=Fraunces:opsz,wght@9..144,700&family=Unbounded:wght@700&family=Syne:wght@800&family=Space+Grotesk:wght@700&family=Cormorant+Garamond:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+<a class="skip" href="#same">Skip to content</a>
+
+<header class="nav" id="nav">
+  <a class="brand" href="#top" aria-label="Scrawl, back to top"><span class="brand-mark" id="brandMark"></span><span>Scrawl</span></a>
+  <nav class="nav-links" aria-label="Sections">
+    <a href="#same">Same subject</a>
+    <a href="#traditions">Traditions</a>
+    <a href="#hand">The hand</a>
+    <a href="#seeds">Seeds</a>
+    <a href="#templates">Templates</a>
+  </nav>
+  <a class="btn btn-small" href="../index.html">Open the editor</a>
+</header>
+
+<main id="top">
+
+  <!-- ============ HERO: a wall that paints itself ============ -->
+  <section class="hero" id="hero" data-style="warli">
+    <div class="hero-copy">
+      <p class="eyebrow">A drawing machine for folk art</p>
+      <h1>Pattern<br>from a <em>rule.</em></h1>
+      <p class="lede" id="heroLede">Scrawl paints Warli, Gond and sketchbook art from a number. Nothing is stock and nothing is clip art: every mark is generated, so change the number and you get a hand that has never drawn before.</p>
+
+      <div class="seedbox" role="group" aria-label="Seed">
+        <span class="seed-label">seed</span>
+        <button class="seed-step" id="seedDown" aria-label="Previous seed">−</button>
+        <input id="seedInput" inputmode="numeric" maxlength="6" aria-label="Seed number" value="000000">
+        <button class="seed-step" id="seedUp" aria-label="Next seed">+</button>
+        <button class="seed-roll" id="seedRoll"><span aria-hidden="true">⟳</span> Roll</button>
+      </div>
+
+      <div class="painter" role="tablist" aria-label="Tradition" id="heroTabs"></div>
+
+      <div class="cta-row">
+        <a class="btn" href="../index.html">Open the editor <span aria-hidden="true">→</span></a>
+        <a class="btn btn-ghost" href="#traditions">Meet the traditions</a>
+      </div>
+    </div>
+
+    <figure class="hero-art">
+      <div class="hero-canvas" id="heroArt"></div>
+      <figcaption id="heroCap"></figcaption>
+    </figure>
+
+    <div class="band" id="heroBand" aria-hidden="true"></div>
+  </section>
+
+  <!-- ============ SAME NAME, OPPOSITE RULE ============ -->
+  <section class="same" id="same">
+    <div class="section-head">
+      <p class="kicker">01 · Same subject</p>
+      <h2>Same deer.<br><em>Opposite rules.</em></h2>
+      <p class="section-lede">An art tradition is a set of rules, not a set of shapes. Warli and Gond draw the same deer, the same peacock, the same water carrier, and they look nothing alike, because what sits underneath is opposite. Pick a subject.</p>
+    </div>
+    <div class="chips" id="subjectChips" role="tablist" aria-label="Subject"></div>
+    <div class="triptych" id="triptych"></div>
+  </section>
+
+  <!-- ============ THE TRADITIONS ============ -->
+  <section class="traditions" id="traditions" aria-label="Traditions">
+    <div class="section-head section-head--wide">
+      <p class="kicker">02 · The traditions</p>
+      <h2>Each one is a <em>discipline</em>,<br>not a folder of clip art.</h2>
+      <p class="section-lede">Switching tradition swaps everything at once: the grounds and pigments it actually used, how the brush behaves, how a shape is filled, and which pieces are on offer. Click a piece to redraw it. Click a swatch to change the wall.</p>
+    </div>
+    <div id="chapters"></div>
+  </section>
+
+  <!-- ============ THE HAND ============ -->
+  <section class="hand" id="hand">
+    <div class="hand-copy">
+      <p class="kicker">03 · The hand</p>
+      <h2>Controlled<br><em>imperfection.</em></h2>
+      <p>The hand-drawn feeling is not a style you can copy from a PNG. Clean geometry goes in, a seeded pen corrupts it, and SVG comes out. A straight line bows a little, a circle overshoots its join, a shape is drawn twice with a small offset.</p>
+      <p>Or, for a tradition that paints with confidence, almost no wobble at all. Each tradition ships its own hand. Try them, then break them.</p>
+      <div class="painter painter--light" id="handTabs" role="tablist" aria-label="Load a tradition's hand"></div>
+      <div class="dials" id="dials"></div>
+    </div>
+    <div class="hand-stage">
+      <div class="hand-art" id="handArt"></div>
+      <p class="hand-readout" id="handReadout"></p>
+    </div>
+  </section>
+
+  <!-- ============ SEEDS ============ -->
+  <section class="seeds" id="seeds">
+    <div class="section-head section-head--row">
+      <div>
+        <p class="kicker">04 · Seeds</p>
+        <h2><span class="bignum" id="seedCount">4,294,967,296</span><br><em>hands per piece.</em></h2>
+      </div>
+      <div class="seeds-side">
+        <p class="section-lede">Every piece is a generator locked to a number. Same seed, same drawing, forever. A new seed is a new hand drawing the same thing. Turn the dials too, and the drawing itself changes.</p>
+        <div class="seeds-controls">
+          <label class="select"><span class="sr-only">Piece</span><select id="seedPiece"></select></label>
+          <label class="switch"><input type="checkbox" id="seedDials" checked><span>Turn the dials too</span></label>
+          <button class="btn btn-small" id="seedShuffle"><span aria-hidden="true">⟳</span> Shuffle</button>
+        </div>
+      </div>
+    </div>
+    <div class="seedwall" id="seedWall"></div>
+  </section>
+
+  <!-- ============ TEMPLATES ============ -->
+  <section class="templates" id="templates">
+    <div class="section-head">
+      <p class="kicker">05 · Starting points</p>
+      <h2>Start from a<br><em>finished wall.</em></h2>
+      <p class="section-lede">Every template is laid out the way its tradition composes. Warli has no hero and no foreground, so its layouts weave across the whole surface. Gond puts one creature in the middle and lets the fill speak. Open one, and every piece in it is still live.</p>
+    </div>
+    <div class="posters" id="posters"></div>
+  </section>
+
+  <!-- ============ HOW IT'S BUILT ============ -->
+  <section class="built" id="built">
+    <div class="section-head">
+      <p class="kicker">06 · Under the paint</p>
+      <h2>Small, open,<br><em>and yours.</em></h2>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="facts">
+      <article class="fact">
+        <span class="fact-art" data-piece="warli:Diamond frame"></span>
+        <h3>Vector the whole way</h3>
+        <p>Every piece is SVG from the first mark. It prints, cuts on a vinyl cutter, scales to a billboard, and stays a few kilobytes. Export PNG, SVG, or a print file with bleed and crop marks.</p>
+      </article>
+      <article class="fact">
+        <span class="fact-art" data-piece="gond:Roundel"></span>
+        <h3>Nothing leaves your browser</h3>
+        <p>No account, no server, no upload. Open the page and draw. Your work saves itself in the browser as you go, and a project file takes it anywhere else.</p>
+      </article>
+      <article class="fact">
+        <span class="fact-art" data-piece="warli:Sun"></span>
+        <h3>Roles, not colours</h3>
+        <p>Pieces draw with roles like line, accent and fill. Change the palette and every drawing on the board recolours itself, so a brand kit takes one click.</p>
+      </article>
+      <article class="fact">
+        <span class="fact-art" data-piece="gond:Tree"></span>
+        <h3>A tradition in four files</h3>
+        <p>Generators, presets, templates and one row of rules. Find the tradition's one mechanism and build on it: Warli's is a table of joints, Gond's is a swept tube.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ============ CLOSE ============ -->
+  <section class="close" id="close">
+    <div class="close-art" id="closeArt" aria-hidden="true"></div>
+    <div class="close-copy">
+      <h2>Pick up<br>the <em>brush.</em></h2>
+      <p>Free, open source, and it runs in this browser tab.</p>
+      <div class="cta-row cta-row--center">
+        <a class="btn btn-light" href="../index.html">Open the editor <span aria-hidden="true">→</span></a>
+        <a class="btn btn-ghost btn-ghost--light" href="https://github.com/Uttambakori/scrawl">Source on GitHub</a>
+      </div>
+    </div>
+    <div class="band band--foot" id="footBand" aria-hidden="true"></div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <p>Scrawl draws from the rules of living art traditions. Warli comes from the Adivasi communities of Maharashtra; Gond from the Gond and Pardhan Gond people of Madhya Pradesh. If you love the look, find and buy work from the artists who keep these traditions alive.</p>
+  <p class="foot-meta">Every drawing on this page was generated live by Scrawl's own engine. Reload for a different page.</p>
+</footer>
+
+<!-- the editor's own engine and packs, straight from the repository -->
+<script src="../engine.js"></script>
+<script src="../icons.js"></script>
+<script src="../gens.js"></script>
+<script src="../gens2.js"></script>
+<script src="../gens3.js"></script>
+<script src="../gens4.js"></script>
+<script src="../presets.js"></script>
+<script src="../presets2.js"></script>
+<script src="../presets3.js"></script>
+<script src="../warli.js"></script>
+<script src="../warli-presets.js"></script>
+<script src="../gond.js"></script>
+<script src="../gond-presets.js"></script>
+<script src="../styles.js"></script>
+<script src="../templates.js"></script>
+<script src="../templates2.js"></script>
+<script src="../warli-templates.js"></script>
+<script src="../gond-templates.js"></script>
+<script src="../data.js"></script>
+<script src="render.js"></script>
+<script src="site.js"></script>
+</body>
+</html>
