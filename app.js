@@ -40,8 +40,10 @@
   const presetByName = (n, style) =>
     (style && PRESETS.find(p => p.name === n && p.style === style)) || PRESETS.find(p => p.name === n);
   function baseWeight(d) { const dd = d || doc; return +(((dd ? dd.w + dd.h : 2160) / 2) / 1080 * 3.2).toFixed(2); }
-  function defaultStyle(d) {
-    const hh = (S.STYLES && S.styleOf(libStyle).hand) || { rough: 1.1, bow: 1, passes: 2, weight: 3.2, fillMode: 'none' };
+  /* The hand belongs to the tradition a piece comes from, not to
+     whichever tradition the library happens to be showing. */
+  function defaultStyle(d, style) {
+    const hh = (S.STYLES && S.styleOf(style || (d && d.style) || libStyle).hand) || { rough: 1.1, bow: 1, passes: 2, weight: 3.2, fillMode: 'none' };
     return {
       stroke: 0, fill: 4, accent: 1,
       weight: +(baseWeight(d) * (hh.weight / 3.2)).toFixed(2),
@@ -141,7 +143,7 @@
   function makeItem(genKey, box, d) {
     const g = GENS[genKey], params = {};
     g.params.forEach(pa => params[pa.k] = pa.def);
-    return { id: uid(), type: 'shape', gen: genKey, params, seed: rint(0, 99999), x: box.x, y: box.y, w: box.w, h: box.h, rot: 0, st: defaultStyle(d), hidden: 0, locked: 0, name: g.label };
+    return { id: uid(), type: 'shape', gen: genKey, params, seed: rint(0, 99999), x: box.x, y: box.y, w: box.w, h: box.h, rot: 0, st: defaultStyle(d, g.style), hidden: 0, locked: 0, name: g.label };
   }
   function makeText(txt, box, d) {
     return { id: uid(), type: 'text', text: txt || 'Text', font: 'Archivo Black', align: 'middle', letter: 0, lineH: 1.08, caps: 0, fit: 1, size: 80, x: box.x, y: box.y, w: box.w, h: box.h, rot: 0, st: Object.assign(defaultStyle(d), { wobble: 0 }), hidden: 0, locked: 0, name: 'Text' };
@@ -959,6 +961,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   function openDoc(d, resetHistory) {
     stopEdit(); if (doc) saveCurrent(true);
     doc = migrateBoards(d); sel.clear();
+    followDocStyle();
     if (resetHistory !== false) { history = []; hi = -1; }
     buildStylePicker(); buildPalettes(); buildLibrary(); refreshPanels(); render(); fitView(); commit();
     $('#docName').textContent = doc.name;
@@ -966,10 +969,12 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   }
 
   /* ---------------- templates ---------------- */
+  /* Pure: the gallery builds every tradition's templates for its
+     previews, so this must not touch the library or the open file. */
   function docFromTemplate(tpl) {
-    if (tpl.style && tpl.style !== libStyle) applyStyle(tpl.style);
     const d = newDoc(tpl.w, tpl.h, tpl.pal, tpl.name === 'Blank canvas' ? 'Untitled' : tpl.name);
-    const pals = S.stylePalettes(tpl.style || libStyle);
+    d.style = tpl.style || 'sketch';
+    const pals = S.stylePalettes(d.style);
     const pr = pals[(tpl.pal || 0) % pals.length];
     d.paper = pr[1]; d.colors = [pr[2], pr[3], pr[4], pr[5], pr[1]]; d.palIdx = tpl.pal || 0;
     d.texture = tpl.texture; d.textureAmt = tpl.amt; d.textureScale = 1;
@@ -1280,19 +1285,33 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
   function styleCats(k) {
     return [...new Set(PRESETS.filter(p => p.style === k).map(p => p.cat))];
   }
+  /* Switching only changes what comes next — the library, the palette
+     choices, the hand new pieces are drawn with. A piece already on the
+     canvas keeps its colours; only an empty file takes the new ground. */
   function applyStyle(k, opts) {
     libStyle = k; libCat = null;
     const st = S.styleOf(k);
-    if (opts && opts.paint) {
-      const pals = S.stylePalettes(k);
-      const p = pals[0];
-      doc.palIdx = st.palettes ? -1 : 0;
-      doc.paper = p[1];
-      doc.colors = [p[2], p[3], p[4], p[5], p[1]];
-      doc.texture = st.texture; doc.textureAmt = st.textureAmt;
-      commit(); render();
+    if (opts && opts.paint && doc) {
+      doc.style = k;
+      if (!doc.items.length) {
+        const p = S.stylePalettes(k)[0];
+        doc.paper = p[1];
+        doc.colors = [p[2], p[3], p[4], p[5], p[1]];
+        doc.texture = st.texture; doc.textureAmt = st.textureAmt;
+        render();
+      } else toast(`New pieces will be ${st.name} — pick a palette to recolour this one`);
+      doc.palIdx = palIndexOf(doc, k);
+      commit();
     }
     buildPalettes(); buildLibrary(); refreshPanels();
+  }
+  /* which of a tradition's palettes a file is wearing, if any */
+  function palIndexOf(d, k) {
+    return S.stylePalettes(k).findIndex(p => p[1] === d.paper && p[2] === d.colors[0] && p[3] === d.colors[1]);
+  }
+  /* opening a file brings its tradition's library with it */
+  function followDocStyle() {
+    if (doc && doc.style && S.STYLES[doc.style]) { libStyle = doc.style; libCat = null; }
   }
   function buildStylePicker() {
     const sel = $('#styleSel'); if (!sel) return;
@@ -1788,6 +1807,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     doc.w = cv[1]; doc.h = cv[2]; syncActiveBoard();
     if (onBrand) { doc.palIdx = -1; doc.paper = bk.paper; doc.colors = bk.colors.slice(); }
     else { doc.palIdx = palIdx; doc.paper = p.paper; doc.colors = p.colors.slice(); }
+    doc.style = libStyle;
     const stx = S.styleOf(libStyle);
     doc.texture = stx.texture || pickOf(TEXTURES);
     doc.textureAmt = stx.textureAmt || +rnd(.04, .2).toFixed(2);
@@ -1873,7 +1893,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     return box;
   }
 
-  let homeTab = 'files', tplCat = 'All';
+  let homeTab = 'files', tplCat = 'All', tplStyle = 'all';
   function openHome(tab) {
     homeTab = tab || homeTab;
     saveCurrent(true);
@@ -1891,23 +1911,46 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     const filterHost = $('#homeFilters'); filterHost.innerHTML = '';
     if (homeTab === 'templates') {
       $('#homeTitle').textContent = 'Start from a template';
-      const myCats = ['All', ...new Set(TEMPLATES.filter(t => (t.style || 'sketch') === libStyle).map(t => t.cat || 'Print'))];
+      /* Every tradition's templates, grouped under their tradition.
+         One row of chips picks the tradition, the next the kind. */
+      const styleOfTpl = t => t.style || 'sketch';
+      const styles = Object.keys(S.STYLES).filter(k => TEMPLATES.some(t => styleOfTpl(t) === k));
+      if (tplStyle !== 'all' && !styles.includes(tplStyle)) tplStyle = 'all';
+      const row = () => { const r = el('div', 'chiprow'); filterHost.appendChild(r); return r; };
+      const styleRow = row();
+      ['all', ...styles].forEach(k => {
+        const n = TEMPLATES.filter(t => k === 'all' || styleOfTpl(t) === k).length;
+        const b = el('button', 'chip' + (k === tplStyle ? ' on' : ''), `${k === 'all' ? 'All traditions' : S.STYLES[k].name} <em>${n}</em>`);
+        b.onclick = () => { tplStyle = k; renderHome(); };
+        styleRow.appendChild(b);
+      });
+      const inStyle = TEMPLATES.filter(t => tplStyle === 'all' || styleOfTpl(t) === tplStyle);
+      const styleNames = Object.values(S.STYLES).map(st => st.name);
+      const myCats = ['All', ...new Set(inStyle.map(t => t.cat || 'Print').filter(c => !styleNames.includes(c)))];
       if (!myCats.includes(tplCat)) tplCat = 'All';
-      myCats.forEach(c => {
+      const catRow = row();
+      if (myCats.length > 2) myCats.forEach(c => {
         const b = el('button', 'chip' + (c === tplCat ? ' on' : ''), c);
         b.onclick = () => { tplCat = c; renderHome(); };
-        filterHost.appendChild(b);
+        catRow.appendChild(b);
       });
-      TEMPLATES
-        .filter(t => (t.style || 'sketch') === libStyle)
+      const shown = inStyle
         .filter(t => tplCat === 'All' || (t.cat || 'Print') === tplCat)
-        .filter(t => !q || t.name.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q))
-        .forEach(tpl => {
-        const card = el('button', 'filecard');
-        card.appendChild(docPreview(docFromTemplate(tpl)));
-        card.appendChild(el('div', 'fileinfo', `<b>${esc(tpl.name)}</b><span>${esc(tpl.desc)}</span>`));
-        card.onclick = () => openDoc(docFromTemplate(tpl));
-        grid.appendChild(card);
+        .filter(t => !q || t.name.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q));
+      if (!shown.length) { grid.appendChild(el('p', 'hint', 'No template matches that.')); return; }
+      /* the tradition you are working in comes first */
+      [libStyle, ...styles.filter(k => k !== libStyle)].forEach(k => {
+        const group = shown.filter(t => styleOfTpl(t) === k);
+        if (!group.length) return;
+        const st = S.STYLES[k];
+        grid.appendChild(el('h3', 'tplgroup', `${esc(st.name)} <span>${esc(st.where)} · ${group.length}</span>`));
+        group.forEach(tpl => {
+          const card = el('button', 'filecard');
+          card.appendChild(docPreview(docFromTemplate(tpl)));
+          card.appendChild(el('div', 'fileinfo', `<b>${esc(tpl.name)}</b><span>${esc(tpl.desc)}</span>`));
+          card.onclick = () => openDoc(docFromTemplate(tpl));
+          grid.appendChild(card);
+        });
       });
       return;
     }
@@ -2397,6 +2440,7 @@ ${forExport ? '' : '<g id="ui"></g>'}</svg>`;
     const rec = s.cur && s.docs[s.cur];
     const firstWarli = TEMPLATES.findIndex(t => t.style === 'warli');
     doc = migrateBoards(rec ? rec.doc : docFromTemplate(TEMPLATES[firstWarli >= 0 ? firstWarli : 0]));
+    followDocStyle();
     bind(); setTool('select'); paintIcons();
     $('#btnSnap').classList.toggle('on', snapOn);
     buildStylePicker(); buildPalettes(); buildLibrary(); refreshPanels(); render(); fitView(); commit();
