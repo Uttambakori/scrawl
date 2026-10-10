@@ -65,6 +65,79 @@
       cats: ['Figures', 'Animals', 'Birds', 'Nature', 'Compositions', 'Borders'],
     },
 
+    madhubani: {
+      key: 'madhubani',
+      name: 'Madhubani',
+      where: 'Mithila, Bihar',
+      note: 'Every contour drawn twice, and the channel between the lines filled — hatched in kachni, solid colour in bharni. Faces in profile with one great fish eye. No ground is left bare.',
+      /* handmade paper and cow-dung washes; lamp-black line, sindoor
+         red, turmeric, leaf green, indigo — then the black-and-red
+         kachni palette, and the bright pinks of recent bharni work */
+      palettes: [
+        ['Handmade paper', '#F2E6CC', '#1E1712', '#C8321E', '#E8A620', '#2E7D4F'],
+        ['Cow-dung wash', '#D8C096', '#231A12', '#B22A1C', '#E9B23A', '#1F5A8A'],
+        ['Kachni', '#F4EBDA', '#1A1411', '#A8251A', '#F4EBDA', '#A8251A'],
+        ['Bharni bright', '#F8EDD6', '#1C1410', '#E0336E', '#F2B41C', '#1E8C6E'],
+        ['Sindoor ground', '#B8331F', '#1A120D', '#F2C230', '#F5EAD2', '#2F6B3A'],
+        ['Indigo line', '#F3E6CC', '#1B2A4E', '#D9481E', '#F0B429', '#2F7A55'],
+        ['Tantric night', '#1C1714', '#F2E3C4', '#E0402A', '#E9B23A', '#3E9A6A'],
+      ],
+      /* a nib, held steady: less wobble than Gond, one pass */
+      hand: { rough: 0.3, bow: 0.35, passes: 1, weight: 2.4, fillMode: 'none' },
+      /* the `fill` role is the third pigment here, not the paper */
+      slots: { fill: 2 },
+      canvas: ['Post 4:5', 1080, 1350],
+      texture: 'fibre', textureAmt: 0.1,
+      cats: ['Figures', 'Animals', 'Birds', 'Nature', 'Compositions', 'Borders'],
+    },
+
+    pattachitra: {
+      key: 'pattachitra',
+      name: 'Pattachitra',
+      where: 'Puri, Odisha',
+      note: 'A flat enamel of mineral colour, a heavy black contour, and a row of beads just inside it. The border is half the painting, and the ground behind a figure is never left empty.',
+      /* hingula red, haritala yellow, conch-shell white, lamp-black,
+         a little indigo — then the palm-leaf engraving's tan */
+      palettes: [
+        ['Hingula red', '#A8281C', '#15100C', '#F4EEDC', '#E3B23C', '#1F3E6E'],
+        ['Haritala yellow', '#E1B13A', '#15100C', '#F4EEDC', '#A8281C', '#1F3E6E'],
+        ['Conch white', '#F2ECDD', '#15100C', '#A8281C', '#E3B23C', '#2A4E7A'],
+        ['Temple indigo', '#1C2B4A', '#0E0A08', '#F2E8CF', '#E3B23C', '#C8352A'],
+        ['Green lac', '#2F5A3A', '#130F0B', '#F1E6CC', '#E3B23C', '#A8281C'],
+        ['Palm leaf', '#D6B67A', '#1B130D', '#F1E3BE', '#D6B67A', '#6B3A1E'],
+      ],
+      /* a fine squirrel-hair brush over a flat ground: steady, heavy */
+      hand: { rough: 0.2, bow: 0.3, passes: 1, weight: 2.4, fillMode: 'none' },
+      slots: { fill: 2 },
+      canvas: ['Post 4:5', 1080, 1350],
+      texture: 'grain', textureAmt: 0.1,
+      cats: ['Figures', 'Animals', 'Birds', 'Nature', 'Compositions', 'Borders'],
+    },
+
+    kalamkari: {
+      key: 'kalamkari',
+      name: 'Kalamkari',
+      where: 'Srikalahasti, Andhra Pradesh',
+      note: 'Drawn with a bamboo pen that swells and thins, then dyed madder, indigo and myrobalan — the dye stopping just short of the line. Paisleys, flowering trees, a hillock of rocks.',
+      /* unbleached cotton, iron-black, madder, indigo, myrobalan
+         yellow; then the dyed grounds of the palampore trade */
+      palettes: [
+        ['Ecru cotton', '#EFE3C8', '#231A14', '#9E2B20', '#2D4A6B', '#C9962E'],
+        ['Myrobalan', '#E3C98E', '#231A14', '#8E2A1E', '#2D4A6B', '#EFE3C8'],
+        ['Madder ground', '#8E2A1E', '#1B1310', '#E9D8B4', '#C9962E', '#2D4A6B'],
+        ['Indigo ground', '#223756', '#F1E4C6', '#C4553A', '#D4A13A', '#F1E4C6'],
+        ['Iron black', '#1D1A17', '#E9D9B6', '#B5402E', '#C9962E', '#6E8A5A'],
+        ['Faded tea', '#E3CFA6', '#3A2A1E', '#A0452E', '#5C7A55', '#2D4A6B'],
+      ],
+      /* the pen is a ribbon, not a stroke, so weight matters little;
+         wobble is low — this is a practised hand */
+      hand: { rough: 0.22, bow: 0.3, passes: 1, weight: 1.6, fillMode: 'none' },
+      slots: { fill: 2 },
+      canvas: ['Post 4:5', 1080, 1350],
+      texture: 'fibre', textureAmt: 0.12,
+      cats: ['Paisley', 'Flora', 'Birds', 'Animals', 'Compositions', 'Borders'],
+    },
+
     sketch: {
       key: 'sketch',
       name: 'Sketchbook',

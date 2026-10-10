@@ -18,21 +18,21 @@ not a set of shapes.** Warli and Gond draw many of the same subjects — a deer,
 tree, a person, a border — and look nothing alike, because the rules underneath
 are opposite.
 
-| | **Warli** | **Gond** | **Sketchbook** |
-|---|---|---|---|
-| Where | Maharashtra | Madhya Pradesh | the original library |
-| Ground | red-ochre earth wall | paper, or a saturated colour | white |
-| Mark | solid white silhouette | clean outline + a signature fill | pen drawn twice |
-| A person is | two triangles meeting at their tips | a flowing tube with joints | whatever you like |
-| Wobble | almost none — it is painted with confidence | a little, brush on paper | plenty |
-| Pieces | 139 | 133 | 524 |
+| | **Warli** | **Gond** | **Madhubani** | **Pattachitra** | **Kalamkari** | **Sketchbook** |
+|---|---|---|---|---|---|---|
+| Where | Maharashtra | Madhya Pradesh | Mithila, Bihar | Puri, Odisha | Srikalahasti, Andhra Pradesh | the original library |
+| Ground | red-ochre earth wall | paper, or a saturated colour | handmade paper | chalk-primed cloth | unbleached cotton, or a dyed ground | white |
+| Mark | solid white silhouette | clean outline + a signature fill | every contour double-lined, the channel hatched or filled | flat colour, heavy black contour, a bead row inside it | a pen line that swells and thins, dye stopping short of it | pen drawn twice |
+| A person is | two triangles meeting at their tips | a flowing tube with joints | a profile face with one frontal fish eye | a tribhanga dancer in patterned cloth | rarely drawn; the tree of life is the subject | whatever you like |
+| Wobble | almost none — it is painted with confidence | a little, brush on paper | a little, nib on paper | very little, a fine brush | almost none, a practised pen | plenty |
+| Pieces | 139 | 133 | 136 | 87 | 85 | 524 |
 
 Switching tradition in the Library dropdown swaps the whole discipline at once:
 its palettes, its ground, its texture, how the brush behaves, and which pieces
 are on offer. It is not a filter over one shared library.
 
 Each pack is one file of generators, one of presets, one of templates, plus a
-row in `styles.js`. Adding a fourth is the same four pieces — see
+row in `styles.js`. Adding a seventh is the same four pieces — see
 [Adding a tradition](#adding-a-tradition).
 
 ---
@@ -65,11 +65,17 @@ kilobytes.
 | `warli-presets.js` / `warli-templates.js` | 139 Warli pieces · 8 Warli layouts. |
 | `gond.js` | 21 Gond generators, built on a swept-tube contour and a signature-fill system. |
 | `gond-presets.js` / `gond-templates.js` | 133 Gond pieces · 8 Gond layouts. |
+| `madhubani.js` | 21 Madhubani generators, built on a double-line contour with a patterned channel. Also exports the shared geometry (`smooth`, `inset`, `tube`, `clipSeg`, `squeeze`…) as `SCRAWL.MADHUBANI`, which the next two packs use. |
+| `madhubani-presets.js` / `madhubani-templates.js` | 136 Madhubani pieces · 8 Madhubani layouts. |
+| `pattachitra.js` | 14 Pattachitra generators, built on an enamel fill: flat colour, cloth pattern, black contour, bead row. |
+| `pattachitra-presets.js` / `pattachitra-templates.js` | 87 Pattachitra pieces · 8 Pattachitra layouts. |
+| `kalamkari.js` | 12 Kalamkari generators, built on a broad-nib ribbon line with the dye inset from it. |
+| `kalamkari-presets.js` / `kalamkari-templates.js` | 85 Kalamkari pieces · 8 Kalamkari layouts. |
 | `data.js` | 40 general palettes, 18 canvas sizes, 32 typefaces, 9 textures, `Surprise` recipes. |
 | `app.js` | The editor. |
 | `index.html` | Shell and styling. |
 
-**162 generators · 796 library pieces · 44 templates · 3 traditions.**
+**209 generators · 1104 library pieces · 68 templates · 6 traditions.**
 
 ---
 
@@ -233,8 +239,15 @@ mystyle: {
   canvas: ['Post 4:5', 1080, 1350],
   texture: 'grain', textureAmt: 0.12,
   cats: ['Figures', 'Animals', 'Borders'],
+  slots: { fill: 2 },   // optional: default palette slots for new items
 },
 ```
+
+`slots` is optional. By default the `'fill'` role paints in the paper colour,
+which suits a tradition that carves light lines out of a dark ground. A
+tradition with a third pigment sets `slots: { fill: 2 }` so every new item's
+fill role uses palette slot 2 instead; Madhubani, Pattachitra and Kalamkari
+all do.
 
 Then add the three `<script>` tags to `index.html` — generators and presets
 **before** `styles.js`, templates **after** `templates2.js`.
@@ -324,3 +337,49 @@ silently blowing the quota.
 
 It's static. Drop the folder on Netlify, Vercel, GitHub Pages, or any host.
 Nothing runs server-side and nothing leaves the browser.
+
+## The website
+
+`site/` is Scrawl's marketing page, built as a painted desktop: an indigo
+wall with windows outlined by hand. On a big screen the windows can be
+dragged by their bars, rolled up, closed and reopened from the desktop icons
+or the menus. Scrawl Paint is the main window, where the peacocks draw
+themselves. On a phone, or before the script runs, the same windows stack
+into one plain column.
+
+It is plain HTML, one stylesheet, one small script and one self-hosted
+variable font (Shantell Sans, SIL Open Font License, in `site/fonts/`).
+Motion is CSS transforms and opacity only. It switches off on machines with
+two cores or less (or with Save-Data on), and everything holds still for
+visitors who ask for reduced motion.
+
+Every picture is drawn by the editor's own generators, once, ahead of time.
+`site/build.js` loads the engine and packs in Node (in the order the editor's
+`index.html` lists them) and writes to `site/art/`:
+
+- `draw-<tradition>.svg`, a peacock in each tradition whose strokes draw
+  themselves on in Scrawl Paint;
+- `made-<name>.webp` and `thumb-<name>.webp`, eight finished templates for
+  the Gallery;
+- `icon-<name>.webp` and `tool-<tradition>.webp`, the desktop icons and
+  Paint's tools, each one a motif;
+- `wall.svg`, the Warli ring painted on the desktop.
+
+The WebP files are rasterised with Playwright when it is installed. It also
+fills the Rulebooks, Paint's tradition data and the library counts in
+`site/index.html`. After adding or changing a tradition, run:
+
+    node site/build.js
+
+and commit what it changes. A new tradition gets a rulebook and a Paint tool
+with no other edit; its palette, peacock and one-line rule can be set in
+`TRAD` at the top of `build.js`.
+
+Scrawl Paint loads the real engine only when a visitor first changes a
+palette, a template or the shuffle. Prices are written in the page and mirror
+`plan.js`; when checkout pages exist, put them in `CONFIG.checkout` in
+`site/site.js` and the Register button switches from the beta offer to
+buying.
+
+Serve the repository root (for GitHub Pages: deploy from the `main` branch,
+root folder) and open `/site/`. Its "Open the editor" links point at `../index.html`.
