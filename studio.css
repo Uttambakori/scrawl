@@ -283,16 +283,17 @@ textarea.copy{font:13px/1.45 'DM Sans',sans-serif}
 @media (min-width:1025px){
   #right .propshead{display:none}
   #right>.phead:first-child{padding:6px 8px 6px 6px;border-bottom:0}
-  .paltoggle{display:flex;align-items:center;gap:5px;flex:1;min-width:0;cursor:pointer;padding:5px 6px;border-radius:6px;color:var(--txt) !important;font-weight:600 !important}
-  .paltoggle:hover{background:var(--hover)}
-  .paltoggle .caret{color:var(--dim);transition:transform .15s var(--ease)}
-  #right.palclosed .paltoggle .caret{transform:rotate(-90deg)}
-  .paltoggle .palname{font:400 11px 'DM Sans';font-style:normal;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  #right.palclosed .palbox,#right.palclosed #brandbar{display:none}
   #right .doccolors{border-bottom:1px solid var(--line)}
   #right:not(.palclosed) .doccolors{border-bottom:0}
   #right .palbox{border-top:1px solid var(--line)}
 }
+/* the palette title folds the palettes away at every size */
+.paltoggle{display:flex;align-items:center;gap:5px;flex:1;min-width:0;cursor:pointer;padding:5px 6px;border-radius:6px;color:var(--txt) !important;font-weight:600 !important}
+.paltoggle:hover{background:var(--hover)}
+.paltoggle .caret{color:var(--dim);transition:transform .15s var(--ease)}
+#right.palclosed .paltoggle .caret{transform:rotate(-90deg)}
+.paltoggle .palname{font:400 11px 'DM Sans';font-style:normal;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#right.palclosed .palbox,#right.palclosed #brandbar{display:none}
 .alignrow{display:flex;align-items:center;gap:1px;padding:4px 8px 6px;border-bottom:1px solid var(--line)}
 .alignrow button.ico{flex:1;min-width:0;padding:6px 0;color:var(--dim)}
 .alignrow button.ico:hover{color:var(--txt)}
@@ -341,3 +342,23 @@ textarea.copy{font:13px/1.45 'DM Sans',sans-serif}
 .upplan button,.upbuy{margin-top:auto;justify-content:center;width:100%}
 .upbuy{display:flex;padding:8px;border-radius:var(--r);background:var(--txt);color:var(--app);text-decoration:none;font:600 12.5px 'DM Sans'}
 @media (max-width:560px){.upcols,.upplans{grid-template-columns:1fr}}
+
+/* ---------- small screens ----------
+   The desktop chrome above meets the tablet and phone layout in index.html. */
+@media (max-width:1024px){
+  #status{display:none}
+  .cmdbtn{min-width:160px}
+}
+@media (max-width:640px){
+  /* rulers cost a phone too much canvas; the header keeps search as an icon */
+  body.rulers .ruler{display:none}
+  body.rulers #toggleLeft,body.rulers #toggleRight{top:10px}
+  body.rulers #toggleLeft{left:10px}
+  body.rulers #toast,body.rulers .hintpill{top:58px}
+  .cmdbtn{min-width:0;padding:6px 8px;border-color:transparent;background:transparent;margin-right:0}
+  .cmdbtn .cmdtxt,.cmdbtn kbd,#themeBtn,#saveState,.brandcaret{display:none}
+  /* the dock scrolls sideways instead of running off the screen */
+  .dock{overflow-x:auto;scrollbar-width:none;justify-content:flex-start}
+  .dock::-webkit-scrollbar{display:none}
+  .dock button{flex:none}
+}
